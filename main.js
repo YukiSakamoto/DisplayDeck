@@ -61,7 +61,7 @@ function init() {
 
   const loader = new GLTFLoader();
   loader.load(
-    './asset/ardea.glb',
+    './asset/ardea0.05.glb',
     (gltf) => {
       const model = gltf.scene;
       model.scale.set(0.01, 0.01, 0.01);
