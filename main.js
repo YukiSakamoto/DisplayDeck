@@ -10,6 +10,10 @@ let gui, gui_x, gui_y, gui_z;
 let axisHelper, axisHelper_absolute = null;
 let duck = null;
 
+const arm_position = {
+  x: 0.0
+};
+
 const euler_angle = {
   x: 0.0,
   y: 0.0,
@@ -37,6 +41,8 @@ const euler_angle = {
 };
 
 
+let arm, deck;
+let load_done = false;
 function init() {
   scene = new THREE.Scene();
 
@@ -61,12 +67,16 @@ function init() {
 
   const loader = new GLTFLoader();
   loader.load(
-    './asset/ardea0.05.glb',
+    './asset/ardea0.05_separate.glb',
     (gltf) => {
       const model = gltf.scene;
       model.scale.set(0.01, 0.01, 0.01);
+      arm = model.getObjectByName('Ardea_Arm');
+      deck = model.getObjectByName('Ardea_Deck');
+      model.traverse((child) => {console.log(child.name)});
       duck = gltf.scene;
       scene.add(gltf.scene);
+      load_done = true;
     },
     undefined,
     (error) => console.error(error)
@@ -77,6 +87,8 @@ function init() {
   const directional_light = new THREE.DirectionalLight(0xFFFFFF, 1);
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
+  const gridhelper = new THREE.GridHelper(100, 10);
+  scene.add(gridhelper);
 
   const controls = new OrbitControls(camera, renderer.domElement);
 
@@ -89,6 +101,9 @@ function init() {
   euler_angle_folder.add(euler_angle, 'type', ['XYZ', 'YZX', 'ZXY', 'XZY', 'YXZ', 'ZYX']);
   euler_angle_folder.add(euler_angle, 'gimbal_lock').name('Gimbal Lock');
   euler_angle_folder.add(euler_angle, 'reset').name('Reset');
+
+  const arm_folder = gui.addFolder('Arm Position');
+  const arm_x = arm_folder.add(arm_position, 'x', -200, 400).name('Arm Position');
 
   animate();
 }
@@ -103,6 +118,9 @@ function animate() {
     duck.rotation.copy(r);
   }
   axisHelper.rotation.copy(r);
+  if (load_done == true) {
+    arm.position.x = arm_position.x;
+  }
 
   renderer.render(scene, camera);
 }
