@@ -10,6 +10,10 @@ let gui, gui_x, gui_y, gui_z;
 let axisHelper, axisHelper_absolute = null;
 let duck = null;
 
+const display_settings = {
+  show_grid_helper: true
+};
+
 const arm_position = {
   x: 0.0
 };
@@ -42,6 +46,7 @@ const euler_angle = {
 
 
 let arm, deck;
+let grid_helper;
 let load_done = false;
 function init() {
   scene = new THREE.Scene();
@@ -87,13 +92,14 @@ function init() {
   const directional_light = new THREE.DirectionalLight(0xFFFFFF, 1);
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
-  const gridhelper = new THREE.GridHelper(100, 10);
-  scene.add(gridhelper);
+  grid_helper = new THREE.GridHelper(100, 10);
+  scene.add(grid_helper);
 
   const controls = new OrbitControls(camera, renderer.domElement);
 
   // lil-gui による GUI
   gui = new GUI();
+  gui.add(display_settings, 'show_grid_helper');
   const euler_angle_folder = gui.addFolder('Euler Angle');
   gui_x = euler_angle_folder.add(euler_angle, 'x', -180, 180).name('Rotate X');
   gui_y = euler_angle_folder.add(euler_angle, 'y', -180, 180).name('Rotate Y');
@@ -114,10 +120,11 @@ function animate() {
   const y_rad = euler_angle.y * Math.PI / 180;
   const z_rad = euler_angle.z * Math.PI / 180;
   const r = new THREE.Euler(x_rad, y_rad, z_rad, euler_angle.type);
-  if (duck != null) {
-    duck.rotation.copy(r);
-  }
-  axisHelper.rotation.copy(r);
+  //if (duck != null) {
+  //  duck.rotation.copy(r);
+  //}
+  //axisHelper.rotation.copy(r);
+  grid_helper.visible = display_settings.show_grid_helper;
   if (load_done == true) {
     arm.position.x = arm_position.x;
   }
