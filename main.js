@@ -7,7 +7,7 @@ import GUI from 'lil-gui';
 
 let scene, camera, renderer;
 let gui, gui_x, gui_y, gui_z;
-let axisHelper, axisHelper_absolute = null;
+let axisHelper;
 let duck = null;
 
 const display_settings = {
@@ -48,6 +48,17 @@ const euler_angle = {
 let arm, deck;
 let grid_helper;
 let load_done = false;
+
+const pointer =  new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+function onPointerMove(event) {
+  pointer.x =  (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  mousemoved_flag = true;
+}
+let INTERSECTED = null;
+let mousemoved_flag = false;
+
 function init() {
   scene = new THREE.Scene();
 
@@ -61,14 +72,13 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
+  window.addEventListener( 'pointermove', onPointerMove );
+
   const geometry = new THREE.BoxGeometry();
   const material = new THREE.MeshNormalMaterial();
 
   axisHelper = new THREE.AxesHelper(5);
   scene.add(axisHelper);
-
-  axisHelper_absolute = new THREE.AxesHelper(1);
-  scene.add(axisHelper_absolute);
 
   const loader = new GLTFLoader();
   loader.load(
@@ -78,7 +88,6 @@ function init() {
       model.scale.set(0.01, 0.01, 0.01);
       arm = model.getObjectByName('Ardea_Arm');
       deck = model.getObjectByName('Ardea_Deck');
-      model.traverse((child) => {console.log(child.name)});
       duck = gltf.scene;
       scene.add(gltf.scene);
       load_done = true;
@@ -120,15 +129,36 @@ function animate() {
   const y_rad = euler_angle.y * Math.PI / 180;
   const z_rad = euler_angle.z * Math.PI / 180;
   const r = new THREE.Euler(x_rad, y_rad, z_rad, euler_angle.type);
-  //if (duck != null) {
-  //  duck.rotation.copy(r);
-  //}
-  //axisHelper.rotation.copy(r);
+
   grid_helper.visible = display_settings.show_grid_helper;
   if (load_done == true) {
     arm.position.x = arm_position.x;
-  }
+    arm.rotation.copy(r);
+    deck.rotation.copy(r);
 
+    if (mousemoved_flag) {
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(scene.children);
+      if (intersects.length > 0) {
+        if (INTERSECTED != intersects[0].object) {
+          if (INTERSECTED){
+            INTERSECTED.material.color.set(INTERSECTED.store_color);
+          } 
+          INTERSECTED = intersects[0].object;
+          //INTERSECTED.currentHex = INTERSECTED.material.emmisive.getHex();
+          INTERSECTED.store_color = INTERSECTED.material.color.clone();
+          INTERSECTED.material.color.set(0xff0000);
+        }
+      } else {
+        if (INTERSECTED) {
+          //INTERSECTED.material.emmisive.setHex(INTERSECTED.currentHex);
+            INTERSECTED.material.color.set(INTERSECTED.store_color);
+        }
+        INTERSECTED = null;
+      }
+      mousemoved_flag = false;
+    }
+  }
   renderer.render(scene, camera);
 }
 
