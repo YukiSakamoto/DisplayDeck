@@ -44,6 +44,10 @@ const euler_angle = {
   }
 };
 
+const top_panel = [
+  { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
+  { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
+];
 
 let arm, deck;
 let grid_helper;
@@ -58,6 +62,8 @@ function onPointerMove(event) {
 }
 let INTERSECTED = null;
 let mousemoved_flag = false;
+
+const colliderGroup = new THREE.Group();
 
 function init() {
   scene = new THREE.Scene();
@@ -95,6 +101,34 @@ function init() {
     undefined,
     (error) => console.error(error)
   );
+
+  for (let i = 0; i < top_panel.length; i++) {
+    let dw = top_panel[i].width / top_panel[i].division;
+    let edge_x = top_panel[i].x - top_panel[i].width/2;
+    console.log(i);
+    console.log(dw);
+    for(let j = 0; j < top_panel[i].division; j++)  {
+      let top_panel_mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1,1,1),
+        new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+      );
+      let center_x = edge_x + dw * (j + 0.5);
+      top_panel_mesh.scale.set(dw, top_panel[i].height, top_panel[i].depth);
+      top_panel_mesh.position.set(center_x, top_panel[i].y, top_panel[i].z);
+      colliderGroup.add(top_panel_mesh);
+    }
+    //let top_panel_obj1 = new THREE.Mesh(
+    //  new THREE.BoxGeometry(1,1,1),
+    //  new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+    //)
+    //top_panel_obj1.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
+    //top_panel_obj1.position.set(top_panel[i].x, top_panel[i].y, top_panel[i].z);
+    //top_panel_objects.add(top_panel_obj1);
+    //colliderGroup.add(top_panel_obj1);
+  }
+  scene.add(colliderGroup);
+
+  
 
   const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
   scene.add(light);
@@ -138,21 +172,25 @@ function animate() {
 
     if (mousemoved_flag) {
       raycaster.setFromCamera(pointer, camera);
-      const intersects = raycaster.intersectObjects(scene.children);
+      //const intersects = raycaster.intersectObjects(scene.children);
+      const intersects = raycaster.intersectObjects(colliderGroup.children);
       if (intersects.length > 0) {
         if (INTERSECTED != intersects[0].object) {
           if (INTERSECTED){
             INTERSECTED.material.color.set(INTERSECTED.store_color);
+            INTERSECTED.material.opacity = 0;
           } 
           INTERSECTED = intersects[0].object;
           //INTERSECTED.currentHex = INTERSECTED.material.emmisive.getHex();
           INTERSECTED.store_color = INTERSECTED.material.color.clone();
           INTERSECTED.material.color.set(0xff0000);
+          INTERSECTED.material.opacity = 0.3;
         }
       } else {
         if (INTERSECTED) {
           //INTERSECTED.material.emmisive.setHex(INTERSECTED.currentHex);
             INTERSECTED.material.color.set(INTERSECTED.store_color);
+            INTERSECTED.material.opacity = 0;
         }
         INTERSECTED = null;
       }
