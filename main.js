@@ -65,27 +65,7 @@ let mousemoved_flag = false;
 
 const colliderGroup = new THREE.Group();
 
-function init() {
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(
-    75, window.innerWidth / window.innerHeight, 0.1, 1000
-  );
-  camera.position.z = 10;
-  camera.position.set(-10, -20, 20);
-
-  renderer = new THREE.WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  window.addEventListener( 'pointermove', onPointerMove );
-
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshNormalMaterial();
-
-  axisHelper = new THREE.AxesHelper(5);
-  scene.add(axisHelper);
-
+function init_model() {
   const loader = new GLTFLoader();
   loader.load(
     './asset/ardea0.05_separate.glb',
@@ -127,6 +107,30 @@ function init() {
     //colliderGroup.add(top_panel_obj1);
   }
   scene.add(colliderGroup);
+}
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(
+    75, window.innerWidth / window.innerHeight, 0.1, 1000
+  );
+  camera.position.z = 10;
+  camera.position.set(-10, -20, 20);
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  window.addEventListener( 'pointermove', onPointerMove );
+
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshNormalMaterial();
+
+  axisHelper = new THREE.AxesHelper(5);
+  scene.add(axisHelper);
+
+  init_model();
 
   
 
