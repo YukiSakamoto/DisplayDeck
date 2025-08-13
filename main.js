@@ -44,6 +44,20 @@ const euler_angle = {
   }
 };
 
+const left_visibility = {
+  left_1: true,
+  left_2: true,
+  left_3: true
+};
+const right_visibility = {
+  right_1: true,
+  right_2: true,
+  right_3: true
+};
+const arm_visibility = {
+  arm: true,
+};
+
 const top_panel = [
   { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
   { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
@@ -63,51 +77,49 @@ function onPointerMove(event) {
 let INTERSECTED = null;
 let mousemoved_flag = false;
 
-const colliderGroup = new THREE.Group();
+const deckGroup = new THREE.Group();
 
-function init_model() {
+const left_obj = [];
+const right_obj = [];
+const arm_obj = [];
+
+function init_model2() {
   const loader = new GLTFLoader();
   loader.load(
-    './asset/ardea0.05_separate.glb',
+    './asset/Ardea_Lightweight.named.glb',
     (gltf) => {
       const model = gltf.scene;
-      model.scale.set(0.01, 0.01, 0.01);
-      arm = model.getObjectByName('Ardea_Arm');
-      deck = model.getObjectByName('Ardea_Deck');
-      duck = gltf.scene;
-      scene.add(gltf.scene);
+      scene.add(model);
+      model.scale.set(10, 10, 10);
+      const left_name_list = ['Left-1', 'Left-2', 'Left-3'];
+      const right_name_list = ['Right-1', 'Right-2', 'Right-3'];
+      left_name_list.forEach((name, index) => {
+        let obj = model.getObjectByName(name);
+        scene.attach(obj);
+        left_obj.push(obj);
+        //deckGroup.add(obj);
+      });
+      right_name_list.forEach((name, index) => {
+        let obj = model.getObjectByName(name);
+        scene.attach(obj);
+        right_obj.push(obj);
+        //deckGroup.add(obj);
+      });
+      {
+        let obj = model.getObjectByName('Arm');
+        scene.attach(obj);
+        arm_obj.push(obj);
+        //deckGroup.add(obj);
+      }
+      
+      scene.remove(model);
+      scene.add(deckGroup);
       load_done = true;
     },
     undefined,
     (error) => console.error(error)
   );
-
-  for (let i = 0; i < top_panel.length; i++) {
-    let dw = top_panel[i].width / top_panel[i].division;
-    let edge_x = top_panel[i].x - top_panel[i].width/2;
-    console.log(i);
-    console.log(dw);
-    for(let j = 0; j < top_panel[i].division; j++)  {
-      let top_panel_mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1,1,1),
-        new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
-      );
-      let center_x = edge_x + dw * (j + 0.5);
-      top_panel_mesh.scale.set(dw, top_panel[i].height, top_panel[i].depth);
-      top_panel_mesh.position.set(center_x, top_panel[i].y, top_panel[i].z);
-      colliderGroup.add(top_panel_mesh);
-    }
-    //let top_panel_obj1 = new THREE.Mesh(
-    //  new THREE.BoxGeometry(1,1,1),
-    //  new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
-    //)
-    //top_panel_obj1.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
-    //top_panel_obj1.position.set(top_panel[i].x, top_panel[i].y, top_panel[i].z);
-    //top_panel_objects.add(top_panel_obj1);
-    //colliderGroup.add(top_panel_obj1);
-  }
-  scene.add(colliderGroup);
-}
+};
 
 function init() {
   scene = new THREE.Scene();
@@ -130,9 +142,7 @@ function init() {
   axisHelper = new THREE.AxesHelper(5);
   scene.add(axisHelper);
 
-  init_model();
-
-  
+  init_model2();
 
   const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
   scene.add(light);
@@ -147,17 +157,22 @@ function init() {
   // lil-gui による GUI
   gui = new GUI();
   gui.add(display_settings, 'show_grid_helper');
-  const euler_angle_folder = gui.addFolder('Euler Angle');
-  gui_x = euler_angle_folder.add(euler_angle, 'x', -180, 180).name('Rotate X');
-  gui_y = euler_angle_folder.add(euler_angle, 'y', -180, 180).name('Rotate Y');
-  gui_z = euler_angle_folder.add(euler_angle, 'z', -180, 180).name('Rotate Z');
-  euler_angle_folder.add(euler_angle, 'type', ['XYZ', 'YZX', 'ZXY', 'XZY', 'YXZ', 'ZYX']);
-  euler_angle_folder.add(euler_angle, 'gimbal_lock').name('Gimbal Lock');
-  euler_angle_folder.add(euler_angle, 'reset').name('Reset');
+
+  const left_visibility_folder = gui.addFolder('LeftVisibility');
+  left_visibility_folder.add(left_visibility, 'left_1');
+  left_visibility_folder.add(left_visibility, 'left_2');
+  left_visibility_folder.add(left_visibility, 'left_3');
+
+  const right_visibility_folder = gui.addFolder('RightVisibility');
+  right_visibility_folder.add(right_visibility, 'right_1');
+  right_visibility_folder.add(right_visibility, 'right_2');
+  right_visibility_folder.add(right_visibility, 'right_3');
+
+  const arm_visibility_folder = gui.addFolder('Arm');
+  arm_visibility_folder.add(arm_visibility, 'arm');
 
   const arm_folder = gui.addFolder('Arm Position');
-  const arm_x = arm_folder.add(arm_position, 'x', -200, 400).name('Arm Position');
-
+  const arm_x = arm_folder.add(arm_position, 'x', -5, 30).name('Arm Position');
   animate();
 }
 
@@ -170,14 +185,20 @@ function animate() {
 
   grid_helper.visible = display_settings.show_grid_helper;
   if (load_done == true) {
-    arm.position.x = arm_position.x;
-    arm.rotation.copy(r);
-    deck.rotation.copy(r);
+    left_obj[0].visible = left_visibility.left_1;
+    left_obj[1].visible = left_visibility.left_2;
+    left_obj[2].visible = left_visibility.left_3;
+    right_obj[0].visible = right_visibility.right_1;
+    right_obj[1].visible = right_visibility.right_2;
+    right_obj[2].visible = right_visibility.right_3;
+    arm_obj[0].visible = arm_visibility.arm;
+
+    arm_obj[0].position.x = arm_position.x;
 
     if (mousemoved_flag) {
       raycaster.setFromCamera(pointer, camera);
       //const intersects = raycaster.intersectObjects(scene.children);
-      const intersects = raycaster.intersectObjects(colliderGroup.children);
+      const intersects = raycaster.intersectObjects(deckGroup.children);
       if (intersects.length > 0) {
         if (INTERSECTED != intersects[0].object) {
           if (INTERSECTED){
