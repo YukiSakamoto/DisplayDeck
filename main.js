@@ -8,10 +8,17 @@ import GUI from 'lil-gui';
 let scene, camera, renderer;
 let gui, gui_x, gui_y, gui_z;
 let axisHelper;
+let ambient_light;
+let directional_light;
 let duck = null;
 
 const display_settings = {
-  show_grid_helper: true
+  show_grid_helper: true,
+  ambient_light_intensity: 0.4,
+  directional_light_intensity: 1.0,
+  directional_light_position_x: 1.0,
+  directional_light_position_y: 2.0,
+  directional_light_position_z: 3.0,
 };
 
 const arm_position = {
@@ -83,6 +90,74 @@ const left_obj = [];
 const right_obj = [];
 const arm_obj = [];
 
+function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true } = {}) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+
+    const toLambert = (mat) => {
+      // 退避（後で元に戻したい場合用）
+      o.userData._origMaterial ??= [];
+      o.userData._origMaterial.push(mat);
+
+      const params = {};
+
+      // 色を継承（必須）
+      if (mat && mat.color) params.color = mat.color.clone();
+      else params.color = new THREE.Color(0x808080); // 色が無い場合のデフォ
+
+      // 任意：ベースカラーテクスチャを継承
+      if (keepMap && mat && mat.map) params.map = mat.map;
+
+      // 任意：透明度系を継承
+      if (keepAlpha && mat) {
+        if (mat.transparent) params.transparent = true;
+        if (typeof mat.opacity === 'number') params.opacity = mat.opacity;
+        if (mat.alphaMap) params.alphaMap = mat.alphaMap;
+      }
+
+      // 裏面表示設定なども継承しておくと画が崩れにくい
+      params.side = (mat && mat.side != null) ? mat.side : THREE.FrontSide;
+
+      return new THREE.MeshLambertMaterial(params);
+    };
+
+    if (Array.isArray(o.material)) {
+      o.material = o.material.map(toLambert);
+    } else {
+      o.material = toLambert(o.material);
+    }
+
+    o.material.needsUpdate = true;
+  });
+}
+
+// 元に戻す（退避しておいたマテリアルに戻す）
+function restoreOriginalMaterials(root) {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.userData._origMaterial) return;
+
+    const restoreOne = (idx) => {
+      const orig = o.userData._origMaterial[idx];
+      if (Array.isArray(o.material)) {
+        o.material[idx]?.dispose?.(); // いまのLambertを破棄
+        o.material[idx] = orig;
+      } else {
+        o.material?.dispose?.();
+        o.material = orig;
+      }
+    };
+
+    if (Array.isArray(o.material)) {
+      for (let i = 0; i < o.material.length; i++) restoreOne(i);
+    } else {
+      restoreOne(0);
+    }
+
+    o.material.needsUpdate = true;
+    delete o.userData._origMaterial;
+  });
+}
+
 function init_model2() {
   const loader = new GLTFLoader();
   loader.load(
@@ -98,6 +173,7 @@ function init_model2() {
         scene.attach(obj);
         left_obj.push(obj);
         //deckGroup.add(obj);
+
       });
       right_name_list.forEach((name, index) => {
         let obj = model.getObjectByName(name);
@@ -114,6 +190,9 @@ function init_model2() {
       
       scene.remove(model);
       scene.add(deckGroup);
+      //replaceAllWithBasic(scene);
+      //replaceAllWithBasicKeepColorMap(scene);
+      replaceWithLambertKeepColor(scene, {keepMap: false, keepAlpha: false});
       load_done = true;
     },
     undefined,
@@ -144,9 +223,9 @@ function init() {
 
   init_model2();
 
-  const light = new THREE.AmbientLight(0xFFFFFF, 1.0);
-  scene.add(light);
-  const directional_light = new THREE.DirectionalLight(0xFFFFFF, 1);
+  ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
+  scene.add(ambient_light);
+  directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
   grid_helper = new THREE.GridHelper(100, 10);
@@ -157,6 +236,11 @@ function init() {
   // lil-gui による GUI
   gui = new GUI();
   gui.add(display_settings, 'show_grid_helper');
+  gui.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
+  gui.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
+  gui.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
+  gui.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
+  gui.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
 
   const left_visibility_folder = gui.addFolder('LeftVisibility');
   left_visibility_folder.add(left_visibility, 'left_1');
@@ -182,6 +266,13 @@ function animate() {
   const y_rad = euler_angle.y * Math.PI / 180;
   const z_rad = euler_angle.z * Math.PI / 180;
   const r = new THREE.Euler(x_rad, y_rad, z_rad, euler_angle.type);
+  ambient_light.intensity = display_settings.ambient_light_intensity;
+  directional_light.intensity = display_settings.directional_light_intensity;
+  directional_light.position.set(
+    display_settings.directional_light_position_x,
+    display_settings.directional_light_position_y,
+    display_settings.directional_light_position_z,
+  );
 
   grid_helper.visible = display_settings.show_grid_helper;
   if (load_done == true) {
