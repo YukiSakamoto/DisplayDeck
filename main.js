@@ -5,13 +5,6 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import GUI from 'lil-gui';
 
-let scene, camera, renderer;
-let gui, gui_x, gui_y, gui_z;
-let axisHelper;
-let ambient_light;
-let directional_light;
-let duck = null;
-
 const display_settings = {
   show_grid_helper: true,
   ambient_light_intensity: 0.4,
@@ -21,74 +14,18 @@ const display_settings = {
   directional_light_position_z: 3.0,
 };
 
-const arm_position = {
-  x: 0.0
-};
+const deck_visibility_settings = new Map();
+const deck_settings = new Map();
 
-const euler_angle = {
-  x: 0.0,
-  y: 0.0,
-  z: 0.0,
-  type: 'XYZ',
-  reset: function(){
-    this.x = 0.0; this.y = 0.0; this.z = 0.0;
-    gui_x.updateDisplay();
-    gui_y.updateDisplay();
-    gui_z.updateDisplay();
-  },
-  gimbal_lock: function() {
-    this.reset();
-    if (this.type[1] == 'X') {
-      this.x = 90;
-    } else if (this.type[1] == 'Y') {
-      this.y = 90;
-    } else if (this.type[1] == 'Z') {
-      this.z = 90;
-    }
-    gui_x.updateDisplay();
-    gui_y.updateDisplay();
-    gui_z.updateDisplay();
-  }
-};
-
-const left_visibility = {
-  left_1: true,
-  left_2: true,
-  left_3: true
-};
-const right_visibility = {
-  right_1: true,
-  right_2: true,
-  right_3: true
-};
-const arm_visibility = {
-  arm: true,
-};
-
-const top_panel = [
-  { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
-  { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
-];
-
-let arm, deck;
-let grid_helper;
-let load_done = false;
-
-const pointer =  new THREE.Vector2();
-const raycaster = new THREE.Raycaster();
-function onPointerMove(event) {
-  pointer.x =  (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  mousemoved_flag = true;
+function placeNextTo(prev, next, gap = 0) {
+  prev.updateWorldMatrix(true, true);
+  next.updateWorldMatrix(true, true);
+  const prevBox = new THREE.Box3().setFromObject(prev);
+  const nextBox = new THREE.Box3().setFromObject(next);
+  const shiftX = (prevBox.max.x + gap) - nextBox.min.x;
+  next.position.x += shiftX;
+  next.updateWorldMatrix(true,true);
 }
-let INTERSECTED = null;
-let mousemoved_flag = false;
-
-const deckGroup = new THREE.Group();
-
-const left_obj = [];
-const right_obj = [];
-const arm_obj = [];
 
 function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true } = {}) {
   root.traverse((o) => {
@@ -131,221 +68,218 @@ function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true }
   });
 }
 
-// 元に戻す（退避しておいたマテリアルに戻す）
-function restoreOriginalMaterials(root) {
-  root.traverse((o) => {
-    if (!o.isMesh || !o.userData._origMaterial) return;
+function init_gui() {
+    const gui = new GUI();
+    gui.add(display_settings, 'show_grid_helper');
+    gui.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
+    gui.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
+    gui.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
+    gui.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
+    gui.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
 
-    const restoreOne = (idx) => {
-      const orig = o.userData._origMaterial[idx];
-      if (Array.isArray(o.material)) {
-        o.material[idx]?.dispose?.(); // いまのLambertを破棄
-        o.material[idx] = orig;
-      } else {
-        o.material?.dispose?.();
-        o.material = orig;
-      }
+    const deck = gui.addFolder('Arm');
+    const params = {};
+    for (const  [key, val] of deck_visibility_settings) {
+        params[key] = val;
+        deck.add(params, key).onChange((v) => {
+            deck_visibility_settings.set(key, v);
+        });
     };
-
-    if (Array.isArray(o.material)) {
-      for (let i = 0; i < o.material.length; i++) restoreOne(i);
-    } else {
-      restoreOne(0);
-    }
-
-    o.material.needsUpdate = true;
-    delete o.userData._origMaterial;
-  });
-}
-
-function placeNextTo(prev, next, gap = 0) {
-  prev.updateWorldMatrix(true, true);
-  next.updateWorldMatrix(true, true);
-  const prevBox = new THREE.Box3().setFromObject(prev);
-  const nextBox = new THREE.Box3().setFromObject(next);
-  const shiftX = (prevBox.max.x + gap) - nextBox.min.x;
-  next.position.x += shiftX;
-  next.updateWorldMatrix(true,true);
-}
-
-
-function init_model2() {
-  const loader = new GLTFLoader();
-  loader.load(
-    './asset/Ardea_Lightweight.named.glb',
-    (gltf) => {
-
-      const n_inside_deck = 2;
-      const model = gltf.scene;
-      scene.add(model);
-      model.scale.set(10, 10, 10);
-      const left_name_list = ['Left-1', 'Left-2', 'Left-3'];
-      const right_name_list = ['Right-1', 'Right-2', 'Right-3'];
-      left_name_list.forEach((name, index) => {
-        let obj = model.getObjectByName(name);
-        scene.attach(obj);
-        left_obj.push(obj);
-        //deckGroup.add(obj);
-
-      });
-      right_name_list.forEach((name, index) => {
-        let obj = model.getObjectByName(name);
-        scene.attach(obj);
-        right_obj.push(obj);
-        //deckGroup.add(obj);
-      });
-      {
-        let obj = model.getObjectByName('Arm');
-        scene.attach(obj);
-        arm_obj.push(obj);
-        //deckGroup.add(obj);
-      }
-
-      let left_obj_tmp = left_obj[1];
-      let right_obj_tmp = right_obj[1];
-      for (let i = 0; i < n_inside_deck-1; i++) {
-        const left_clone = left_obj[1].clone();
-        const right_clone = right_obj[1].clone();
-        scene.add(left_clone);
-        scene.add(right_clone);
-
-        placeNextTo(left_obj_tmp, left_clone);
-        placeNextTo(right_obj_tmp, right_clone);
-
-        left_obj_tmp = left_clone;
-        right_obj_tmp = right_clone;
-
-        console.log(`${i} / ${n_inside_deck}`);
-      }
-      placeNextTo(left_obj_tmp, left_obj[2]);
-      placeNextTo(right_obj_tmp, right_obj[2]);
-      
-      scene.remove(model);
-      scene.add(deckGroup);
-      //replaceAllWithBasic(scene);
-      //replaceAllWithBasicKeepColorMap(scene);
-      replaceWithLambertKeepColor(scene, {keepMap: false, keepAlpha: false});
-      load_done = true;
-    },
-    undefined,
-    (error) => console.error(error)
-  );
 };
 
-function init() {
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(
+function createCtx() {
+  // scene
+  const scene = new THREE.Scene();
+  //camera
+  const camera = new THREE.PerspectiveCamera(
     75, window.innerWidth / window.innerHeight, 0.1, 1000
   );
   camera.position.z = 10;
   camera.position.set(-10, -20, 20);
-
-  renderer = new THREE.WebGLRenderer();
+  // renderer
+  const renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
-
-  window.addEventListener( 'pointermove', onPointerMove );
-
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshNormalMaterial();
-
-  axisHelper = new THREE.AxesHelper(5);
-  scene.add(axisHelper);
-
-  init_model2();
-
-  ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
+  // handler
+  //window.addEventListener( 'pointermove', onPointerMove );
+  //ambient_light
+  const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
   scene.add(ambient_light);
-  directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
+  // directional light
+  const directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
-  grid_helper = new THREE.GridHelper(100, 10);
+  // grid_helper
+  const grid_helper = new THREE.GridHelper(100, 10);
   scene.add(grid_helper);
-
+  // orbit contols
   const controls = new OrbitControls(camera, renderer.domElement);
-
-  // lil-gui による GUI
-  gui = new GUI();
-  gui.add(display_settings, 'show_grid_helper');
-  gui.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
-  gui.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
-  gui.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
-  gui.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
-  gui.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
-
-  const left_visibility_folder = gui.addFolder('LeftVisibility');
-  left_visibility_folder.add(left_visibility, 'left_1');
-  left_visibility_folder.add(left_visibility, 'left_2');
-  left_visibility_folder.add(left_visibility, 'left_3');
-
-  const right_visibility_folder = gui.addFolder('RightVisibility');
-  right_visibility_folder.add(right_visibility, 'right_1');
-  right_visibility_folder.add(right_visibility, 'right_2');
-  right_visibility_folder.add(right_visibility, 'right_3');
-
-  const arm_visibility_folder = gui.addFolder('Arm');
-  arm_visibility_folder.add(arm_visibility, 'arm');
-
-  const arm_folder = gui.addFolder('Arm Position');
-  const arm_x = arm_folder.add(arm_position, 'x', -5, 30).name('Arm Position');
-  animate();
+  return {
+    scene: scene,
+    camera: camera,
+    renderer: renderer,
+    controls: controls,
+    registry: new Map(),
+  };
 }
+
+
+const reg = {
+    /**
+     * register object and add it to Scene
+     * @param {*} ctx
+     * @param {string} id   一意なID（"box/main" のような階層名推奨）
+     * @param {THREE.Object3D} obj
+     */
+    add(ctx, id, obj) {
+        if (ctx.registry.has(id)) {
+            throw new Error(`Duplicate id : ${id}`);
+        }
+        obj.userData.id = id;
+        ctx.registry.set(id, obj);
+        ctx.scene.add(obj);
+    },
+    attach(ctx, id, obj) {
+        if (ctx.registry.has(id)) {
+            throw new Error(`Duplicate id : ${id}`);
+        }
+        obj.userData.id = id;
+        ctx.registry.set(id, obj);
+        ctx.scene.attach(obj);
+    },
+    /**
+     * Get registered object
+     * @param {*} ctx
+     * @param {string} id
+     * @returns {THREE.Object3D}
+     */
+    get(ctx, id) {
+        const obj = ctx.registry.get(id);
+        if (!obj) {
+            throw new Error(`Not found: ${id}`);
+        }
+        return obj;
+    },
+    /**
+     * 条件に合う全オブジェクトを配列で取得（タグ絞り込みなどに）
+     * @param {*} ctx
+     * @param {(o:THREE.Object3D)=>boolean} [predicate]
+     * @returns {THREE.Object3D[]}
+     */
+    all(ctx, predicate) {
+        const arr = Array.from(ctx.registry.values());
+        return predicate ? arr.filter(predicate) : arr;
+    },
+    /**
+     * Scene から除去し、レジストリからも削除
+     * （disposeは用途に応じて別途ユーティリティで）
+     * @param {*} ctx
+     * @param {string} id
+     */
+    remove(ctx, id) {
+        const obj = this.get(ctx, id);
+        ctx.scene.remove(obj);
+        ctx.registry.delete(id);
+    },
+
+    extract_and_attach_to_scene(ctx, parent_model, extract_name_list) {
+        ctx.scene.add(parent_model);
+        extract_name_list.forEach(name => {
+            let obj = parent_model.getObjectByName(name);
+            this.attach(ctx, name, obj);
+
+            //ctx.registry.set(name, obj);
+        });
+        ctx.scene.remove(parent_model);
+    },
+};
+
+function init_lighting(ctx) {
+    const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
+    const directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
+    directional_light.position.set(1, 2, 3);
+    reg.add(ctx, "light:ambient", ambient_light);
+    reg.add(ctx, "light:directional", directional_light);
+}
+
+function init_helper(ctx) {
+  const axisHelper = new THREE.AxesHelper(5);
+  reg.add(ctx, "helper:axis", axisHelper);
+}
+
+function init_model2(ctx, n_additional_deck = 1) {
+    model_load_done = false;
+    const model_file = './asset/Ardea_Lightweight.named.glb';
+    const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
+    const loader = new GLTFLoader();
+    loader.load(model_file, (gltf) => {
+        const n_inside_deck = 2;
+        const model = gltf.scene;
+        model.scale.set(10, 10, 10);
+        reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
+        replaceWithLambertKeepColor(ctx.scene, {keepMap:false, keepAlpha:true});
+
+        // Object clone and Layout modificaton
+        let left_one = reg.get(ctx, "Left-2");
+        let right_one = reg.get(ctx, "Right-2");
+        for(let i = 0; i < n_additional_deck; i++) {
+            const left_clone = reg.get(ctx, 'Left-2').clone();
+            const right_clone = reg.get(ctx, 'Right-2').clone();
+            const left_new_id = `Left-2:${i}`
+            const right_new_id = `Right-2:${i}`
+
+            reg.add(ctx, left_new_id, left_clone);
+            reg.add(ctx, right_new_id, right_clone);
+
+            placeNextTo(left_one, left_clone);
+            placeNextTo(right_one, right_clone);
+
+            left_one = left_clone;
+            right_one = right_clone;
+        }
+        placeNextTo(left_one, reg.get(ctx, 'Left-3'));
+        placeNextTo(right_one, reg.get(ctx, 'Right-3'));
+
+        model_load_done = true;
+    });
+
+    obj_name_list.forEach( (name) => { deck_visibility_settings.set(name, true); });
+    for(let i = 0; i < n_additional_deck; i++) {
+        deck_visibility_settings.set(`Left-2:${i}`, true);
+        deck_visibility_settings.set(`Right-2:${i}`, true);
+    }
+    deck_settings.set("arm_position", 0);
+}
+
+let model_load_done = false;
+const ctx = createCtx();
+init_model2(ctx);
+init_helper(ctx);
+init_lighting(ctx);
+init_gui();
+console.log(ctx);
 
 function animate() {
-  requestAnimationFrame(animate);
-  const x_rad = euler_angle.x * Math.PI / 180;
-  const y_rad = euler_angle.y * Math.PI / 180;
-  const z_rad = euler_angle.z * Math.PI / 180;
-  const r = new THREE.Euler(x_rad, y_rad, z_rad, euler_angle.type);
-  ambient_light.intensity = display_settings.ambient_light_intensity;
-  directional_light.intensity = display_settings.directional_light_intensity;
-  directional_light.position.set(
-    display_settings.directional_light_position_x,
-    display_settings.directional_light_position_y,
-    display_settings.directional_light_position_z,
-  );
+    requestAnimationFrame(animate);
+    let ambient_light = reg.get(ctx, "light:ambient");
+    ambient_light.intensity = display_settings.ambient_light_intensity;
 
-  grid_helper.visible = display_settings.show_grid_helper;
-  if (load_done == true) {
-    left_obj[0].visible = left_visibility.left_1;
-    left_obj[1].visible = left_visibility.left_2;
-    left_obj[2].visible = left_visibility.left_3;
-    right_obj[0].visible = right_visibility.right_1;
-    right_obj[1].visible = right_visibility.right_2;
-    right_obj[2].visible = right_visibility.right_3;
-    arm_obj[0].visible = arm_visibility.arm;
+    let directional_light = reg.get(ctx, "light:directional");
+    directional_light.intensity = display_settings.directional_light_intensity;
+    directional_light.position.x = display_settings.directional_light_position_x;
+    directional_light.position.y = display_settings.directional_light_position_y;
+    directional_light.position.z = display_settings.directional_light_position_z;
 
-    arm_obj[0].position.x = arm_position.x;
-
-    if (mousemoved_flag) {
-      raycaster.setFromCamera(pointer, camera);
-      //const intersects = raycaster.intersectObjects(scene.children);
-      const intersects = raycaster.intersectObjects(deckGroup.children);
-      if (intersects.length > 0) {
-        if (INTERSECTED != intersects[0].object) {
-          if (INTERSECTED){
-            INTERSECTED.material.color.set(INTERSECTED.store_color);
-            INTERSECTED.material.opacity = 0;
-          } 
-          INTERSECTED = intersects[0].object;
-          //INTERSECTED.currentHex = INTERSECTED.material.emmisive.getHex();
-          INTERSECTED.store_color = INTERSECTED.material.color.clone();
-          INTERSECTED.material.color.set(0xff0000);
-          INTERSECTED.material.opacity = 0.3;
-        }
-      } else {
-        if (INTERSECTED) {
-          //INTERSECTED.material.emmisive.setHex(INTERSECTED.currentHex);
-            INTERSECTED.material.color.set(INTERSECTED.store_color);
-            INTERSECTED.material.opacity = 0;
-        }
-        INTERSECTED = null;
-      }
-      mousemoved_flag = false;
+    if (model_load_done === true) {
+        reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
+        deck_visibility_settings.forEach((val, key) => {
+            reg.get(ctx, key).visible = val;
+            console.log(key, val);
+        });
     }
-  }
-  renderer.render(scene, camera);
+
+    console.log(reg.registry);
+    ctx.renderer.render(ctx.scene, ctx.camera);
 }
 
-init();
+animate();
