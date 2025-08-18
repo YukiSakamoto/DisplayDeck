@@ -158,11 +158,24 @@ function restoreOriginalMaterials(root) {
   });
 }
 
+function placeNextTo(prev, next, gap = 0) {
+  prev.updateWorldMatrix(true, true);
+  next.updateWorldMatrix(true, true);
+  const prevBox = new THREE.Box3().setFromObject(prev);
+  const nextBox = new THREE.Box3().setFromObject(next);
+  const shiftX = (prevBox.max.x + gap) - nextBox.min.x;
+  next.position.x += shiftX;
+  next.updateWorldMatrix(true,true);
+}
+
+
 function init_model2() {
   const loader = new GLTFLoader();
   loader.load(
     './asset/Ardea_Lightweight.named.glb',
     (gltf) => {
+
+      const n_inside_deck = 2;
       const model = gltf.scene;
       scene.add(model);
       model.scale.set(10, 10, 10);
@@ -187,6 +200,25 @@ function init_model2() {
         arm_obj.push(obj);
         //deckGroup.add(obj);
       }
+
+      let left_obj_tmp = left_obj[1];
+      let right_obj_tmp = right_obj[1];
+      for (let i = 0; i < n_inside_deck-1; i++) {
+        const left_clone = left_obj[1].clone();
+        const right_clone = right_obj[1].clone();
+        scene.add(left_clone);
+        scene.add(right_clone);
+
+        placeNextTo(left_obj_tmp, left_clone);
+        placeNextTo(right_obj_tmp, right_clone);
+
+        left_obj_tmp = left_clone;
+        right_obj_tmp = right_clone;
+
+        console.log(`${i} / ${n_inside_deck}`);
+      }
+      placeNextTo(left_obj_tmp, left_obj[2]);
+      placeNextTo(right_obj_tmp, right_obj[2]);
       
       scene.remove(model);
       scene.add(deckGroup);
