@@ -12,6 +12,15 @@ const display_settings = {
   directional_light_position_x: 1.0,
   directional_light_position_y: 2.0,
   directional_light_position_z: 3.0,
+
+};
+
+let need_initialize = false;
+const init_settings = {
+  additional_deck: 1,
+  initialize() {
+    need_initialize = true;
+  },
 };
 
 const deck_visibility_settings = new Map();
@@ -69,7 +78,7 @@ function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true }
 }
 
 function init_gui() {
-    const gui = new GUI();
+    gui = new GUI();
     gui.add(display_settings, 'show_grid_helper');
     gui.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
     gui.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
@@ -77,7 +86,11 @@ function init_gui() {
     gui.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
     gui.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
 
-    const deck = gui.addFolder('Arm');
+    const init_gui = gui.addFolder('Initialize');
+    init_gui.add(init_settings, 'additional_deck', 0, 3, 1);
+    init_gui.add(init_settings, 'initialize');
+
+    const deck = gui.addFolder('Visibility');
     const params = {};
     for (const  [key, val] of deck_visibility_settings) {
         params[key] = val;
@@ -182,6 +195,16 @@ const reg = {
         ctx.registry.delete(id);
     },
 
+    remove_all(ctx) {
+      //ctx.registry.keys((key) => {
+      //  console.log(key);
+      //  this.remove(ctx, key);
+      //})
+      for (const id of Array.from(ctx.registry.keys())) {
+        this.remove(ctx, id);  // ← scene.remove + registry.delete を一元処理
+      }
+    },
+
     extract_and_attach_to_scene(ctx, parent_model, extract_name_list) {
         ctx.scene.add(parent_model);
         extract_name_list.forEach(name => {
@@ -252,6 +275,7 @@ function init_model2(ctx, n_additional_deck = 1) {
 }
 
 let model_load_done = false;
+let gui;
 const ctx = createCtx();
 init_model2(ctx);
 init_helper(ctx);
@@ -270,15 +294,26 @@ function animate() {
     directional_light.position.y = display_settings.directional_light_position_y;
     directional_light.position.z = display_settings.directional_light_position_z;
 
+    if (need_initialize) {
+      gui.destroy();
+      deck_visibility_settings.clear();
+      need_initialize = false;
+      console.log('update');
+      reg.remove_all(ctx);
+      console.log('remove done');
+      init_model2(ctx,init_settings.additional_deck );
+      init_helper(ctx);
+      init_lighting(ctx);
+      init_gui();
+    }
+
     if (model_load_done === true) {
         reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
         deck_visibility_settings.forEach((val, key) => {
             reg.get(ctx, key).visible = val;
-            console.log(key, val);
         });
     }
 
-    console.log(reg.registry);
     ctx.renderer.render(ctx.scene, ctx.camera);
 }
 
