@@ -225,14 +225,16 @@ const reg = {
     },
 
     extract_and_attach_to_scene(ctx, parent_model, extract_name_list) {
+        const picked = []
         ctx.scene.add(parent_model);
         extract_name_list.forEach(name => {
             let obj = parent_model.getObjectByName(name);
             this.attach(ctx, name, obj);
-
-            //ctx.registry.set(name, obj);
+            picked.push(obj);
         });
         ctx.scene.remove(parent_model);
+
+        return picked;
     },
 };
 
@@ -255,15 +257,26 @@ function init_collider(ctx, n_additional_deck = 1) {
     { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
   ];
   const collider_group = new THREE.Group();
+  const dx = 12 / 6;
   for(let i = 0; i < top_panel.length; i++) {
-    let top_panel_mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
-    );
-    top_panel_mesh.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
-    top_panel_mesh.position.set(top_panel[i].x, top_panel[i].y, top_panel[i].z);
-    collider_group.add(top_panel_mesh);
+    let x = dx / 2;
+    for(let j = 0; j < (3+n_additional_deck) * 6; j++) {
+      let top_panel_mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+      );
+      top_panel_mesh.position.set(x, top_panel[i].y, top_panel[i].z);
+      top_panel_mesh.scale.set(dx, top_panel[i].height, top_panel[i].depth);
+      collider_group.add(top_panel_mesh);
+      x += dx;
+    }
+    //top_panel_mesh.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
   }
+  let collider_box = new THREE.Box3().setFromObject(collider_group);
+  let center = new THREE.Vector3();
+  collider_box.getCenter(center);
+  center.y = 0;
+  collider_group.position.sub(center);
   reg.add(ctx, "Collider", collider_group);
 }
 
@@ -324,16 +337,16 @@ function init_model2(ctx, n_additional_deck = 1) {
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
     const loader = new GLTFLoader();
     loader.load(model_file, (gltf) => {
-        const collider_group = new THREE.Group();
         const model = gltf.scene;
         model.scale.set(10, 10, 10);
-        reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
+        const collider_group = new THREE.Group();
+        const model_objects = reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
         replaceWithLambertKeepColor(ctx.scene, {keepMap:false, keepAlpha:true});
 
         // Object clone and Layout modificaton
         let left_one = reg.get(ctx, "Left-2");
-        //setup_collider(ctx, left_one, collider_group,  6);
         let right_one = reg.get(ctx, "Right-2");
+        //setup_collider(ctx, left_one, collider_group,  6);
         //setup_collider(ctx, right_one, collider_group, 6);
         for(let i = 0; i < n_additional_deck; i++) {
             const left_clone = reg.get(ctx, 'Left-2').clone();
@@ -343,6 +356,8 @@ function init_model2(ctx, n_additional_deck = 1) {
 
             reg.add(ctx, left_new_id, left_clone);
             reg.add(ctx, right_new_id, right_clone);
+            model_objects.push(left_clone);
+            model_objects.push(right_clone);
 
             placeNextTo(left_one, left_clone);
             placeNextTo(right_one, right_clone);
@@ -353,11 +368,19 @@ function init_model2(ctx, n_additional_deck = 1) {
         placeNextTo(left_one, reg.get(ctx, 'Left-3'));
         placeNextTo(right_one, reg.get(ctx, 'Right-3'));
 
-        obj_name_list.forEach( (name) => {
-          let obj = reg.get(ctx, name);
-          setup_collider(ctx, obj, collider_group, 6);
-        });
-        reg.add(ctx, "Collider", collider_group);
+        const model_group = new THREE.Group();
+        reg.add(ctx, "model", model_group);
+        model_objects.forEach((obj) => {
+          obj.updateWorldMatrix(true, true);
+          model_group.attach(obj)
+        })
+        const box = new THREE.Box3().setFromObject(model_group);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        center.y = 0;
+        console.log(center);
+        model_group.position.sub(center);
+
         ctx.model_load_done_flag = true;
     });
     obj_name_list.forEach( (name) => { deck_visibility_settings.set(name, true); });
@@ -372,7 +395,7 @@ let gui;
 const ctx = createCtx();
 init_model2(ctx);
 init_helper(ctx);
-//init_collider(ctx);
+init_collider(ctx);
 init_raycaster(ctx);
 init_lighting(ctx);
 init_gui();
@@ -400,7 +423,7 @@ function animate() {
       init_helper(ctx);
       init_lighting(ctx);
       init_gui();
-      //init_collider(ctx);
+      init_collider(ctx, init_settings.additional_deck );
     }
 
     if (ctx.model_load_done_flag === true) {
