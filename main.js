@@ -127,13 +127,32 @@ function createCtx() {
   scene.add(grid_helper);
   // orbit contols
   const controls = new OrbitControls(camera, renderer.domElement);
+
   return {
     scene: scene,
     camera: camera,
     renderer: renderer,
     controls: controls,
     registry: new Map(),
+    model_load_done_flag: false,
+    raycaster: null,
+    pointer: null,
+    mousemoved_flag: false,
+    INTERSECTED: null,
   };
+}
+
+function init_raycaster(ctx) {
+  const pointer = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  ctx.raycaster = raycaster;
+  ctx.pointer = pointer;
+  function onPointerMove(event) {
+    ctx.pointer.x =  (event.clientX / window.innerWidth) * 2 - 1;
+    ctx.pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    ctx.mousemoved_flag = true;
+  }
+  window.addEventListener('pointermove', onPointerMove);
 }
 
 
@@ -230,13 +249,82 @@ function init_helper(ctx) {
   reg.add(ctx, "helper:axis", axisHelper);
 }
 
+function init_collider(ctx, n_additional_deck = 1) {
+  const top_panel = [
+    { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
+    { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
+  ];
+  const collider_group = new THREE.Group();
+  for(let i = 0; i < top_panel.length; i++) {
+    let top_panel_mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+    );
+    top_panel_mesh.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
+    top_panel_mesh.position.set(top_panel[i].x, top_panel[i].y, top_panel[i].z);
+    collider_group.add(top_panel_mesh);
+  }
+  reg.add(ctx, "Collider", collider_group);
+}
+
+function point_collider(ctx, scene_id) {
+  ctx.raycaster.setFromCamera(ctx.pointer, ctx.camera);
+  const intersects = ctx.raycaster.intersectObjects(reg.get(ctx, scene_id).children);
+  if (intersects.length > 0) {
+    if (ctx.INTERSECTED != intersects[0].object) {
+      if (ctx.INTERSECTED) {
+        ctx.INTERSECTED.material.color.set(ctx.INTERSECTED.store_color);
+        ctx.INTERSECTED.material.opacity = 0;
+      }
+      ctx.INTERSECTED = intersects[0].object;
+      ctx.INTERSECTED.store_color = ctx.INTERSECTED.material.color.clone();
+      ctx.INTERSECTED.material.color.set(0xff0000);
+      ctx.INTERSECTED.material.opacity = 0.3;
+    }
+  } else {
+    if (ctx.INTERSECTED) {
+      ctx.INTERSECTED.material.color.set(ctx.INTERSECTED.store_color);
+      ctx.INTERSECTED.material.opacity = 0;
+    }
+    ctx.INTERSECTED = null;
+  }
+  ctx.mousemoved_flag = false;
+}
+
+function setup_collider(ctx, obj, collider_group, division = 6) {
+  obj.updateWorldMatrix(true, true);
+  const objBox = new THREE.Box3().setFromObject(obj);
+  console.log(obj);
+  console.log('-----');
+  console.log(objBox);
+  let x_length = objBox.max.x - objBox.min.x;
+  let y_length = objBox.max.y - objBox.min.y;
+  let z_length = objBox.max.z - objBox.min.z;
+  y_length = 0.5;
+
+  let dx = x_length / division;
+  let x_center = objBox.min.x + x_length / 2;
+  let z_center = objBox.min.z + z_length / 2;
+  let y_pos = objBox.max.y + 0.1;
+  for(let i = 0; i < division; i++) {
+    let x_pos = objBox.min.x + dx * (i + 0.5);
+    let collider_mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+    );
+    collider_mesh.scale.set(dx, y_length, z_length);
+    collider_mesh.position.set(x_pos, y_pos, z_center);
+    collider_group.add(collider_mesh);
+  }
+}
+
 function init_model2(ctx, n_additional_deck = 1) {
-    model_load_done = false;
+    ctx.model_load_done_flag = false;
     const model_file = './asset/Ardea_Lightweight.named.glb';
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
     const loader = new GLTFLoader();
     loader.load(model_file, (gltf) => {
-        const n_inside_deck = 2;
+        const collider_group = new THREE.Group();
         const model = gltf.scene;
         model.scale.set(10, 10, 10);
         reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
@@ -244,7 +332,9 @@ function init_model2(ctx, n_additional_deck = 1) {
 
         // Object clone and Layout modificaton
         let left_one = reg.get(ctx, "Left-2");
+        //setup_collider(ctx, left_one, collider_group,  6);
         let right_one = reg.get(ctx, "Right-2");
+        //setup_collider(ctx, right_one, collider_group, 6);
         for(let i = 0; i < n_additional_deck; i++) {
             const left_clone = reg.get(ctx, 'Left-2').clone();
             const right_clone = reg.get(ctx, 'Right-2').clone();
@@ -263,9 +353,13 @@ function init_model2(ctx, n_additional_deck = 1) {
         placeNextTo(left_one, reg.get(ctx, 'Left-3'));
         placeNextTo(right_one, reg.get(ctx, 'Right-3'));
 
-        model_load_done = true;
+        obj_name_list.forEach( (name) => {
+          let obj = reg.get(ctx, name);
+          setup_collider(ctx, obj, collider_group, 6);
+        });
+        reg.add(ctx, "Collider", collider_group);
+        ctx.model_load_done_flag = true;
     });
-
     obj_name_list.forEach( (name) => { deck_visibility_settings.set(name, true); });
     for(let i = 0; i < n_additional_deck; i++) {
         deck_visibility_settings.set(`Left-2:${i}`, true);
@@ -274,11 +368,12 @@ function init_model2(ctx, n_additional_deck = 1) {
     deck_settings.set("arm_position", 0);
 }
 
-let model_load_done = false;
 let gui;
 const ctx = createCtx();
 init_model2(ctx);
 init_helper(ctx);
+//init_collider(ctx);
+init_raycaster(ctx);
 init_lighting(ctx);
 init_gui();
 console.log(ctx);
@@ -297,21 +392,26 @@ function animate() {
     if (need_initialize) {
       gui.destroy();
       deck_visibility_settings.clear();
+      reg.remove_all(ctx);
       need_initialize = false;
       console.log('update');
-      reg.remove_all(ctx);
       console.log('remove done');
       init_model2(ctx,init_settings.additional_deck );
       init_helper(ctx);
       init_lighting(ctx);
       init_gui();
+      //init_collider(ctx);
     }
 
-    if (model_load_done === true) {
+    if (ctx.model_load_done_flag === true) {
         reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
         deck_visibility_settings.forEach((val, key) => {
             reg.get(ctx, key).visible = val;
         });
+    }
+    if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
+      console.log("mouse moved");
+      point_collider(ctx, "Collider");
     }
 
     ctx.renderer.render(ctx.scene, ctx.camera);
