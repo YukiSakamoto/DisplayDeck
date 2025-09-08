@@ -267,6 +267,7 @@ function init_collider(ctx, n_additional_deck = 1) {
       );
       top_panel_mesh.position.set(x, top_panel[i].y, top_panel[i].z);
       top_panel_mesh.scale.set(dx, top_panel[i].height, top_panel[i].depth);
+      top_panel_mesh.userData.index = j;
       collider_group.add(top_panel_mesh);
       x += dx;
     }
