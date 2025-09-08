@@ -253,8 +253,8 @@ function init_helper(ctx) {
 
 function init_collider(ctx, n_additional_deck = 1) {
   const top_panel = [
-    { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
-    { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},
+    { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},  // left
+    { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},  // right
   ];
   const collider_group = new THREE.Group();
   const dx = 12 / 6;
@@ -263,9 +263,10 @@ function init_collider(ctx, n_additional_deck = 1) {
     for(let j = 0; j < (3+n_additional_deck) * 6; j++) {
       let top_panel_mesh = new THREE.Mesh(
         new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshBasicMaterial({transparent: true, opacity: 0})
+        new THREE.MeshBasicMaterial({transparent: false, opacity: 0})
       );
       top_panel_mesh.position.set(x, top_panel[i].y, top_panel[i].z);
+      top_panel_mesh.name = `${i == 0 ? "left":"right"}-${j}`;
       top_panel_mesh.scale.set(dx, top_panel[i].height, top_panel[i].depth);
       top_panel_mesh.userData.index = j;
       collider_group.add(top_panel_mesh);
@@ -278,6 +279,7 @@ function init_collider(ctx, n_additional_deck = 1) {
   collider_box.getCenter(center);
   center.y = 0;
   collider_group.position.sub(center);
+  collider_group.updateWorldMatrix(true, true);
   reg.add(ctx, "Collider", collider_group);
 }
 
@@ -392,6 +394,30 @@ function init_model2(ctx, n_additional_deck = 1) {
     deck_settings.set("arm_position", 0);
 }
 
+function init_equipments(ctx, model_file, object_id, left_right = "left", index = 0, width = 1) {
+    //const model_file = './asset/Xpeel_v2.glb';
+    const loader = new GLTFLoader();
+    loader.load(model_file, (gltf) => {
+        const model = gltf.scene;
+        model.scale.set(10,10,10);
+        reg.add(ctx, object_id, model);
+
+        const obj = reg.get(ctx, object_id);
+        const collider_group = reg.get(ctx, "Collider");
+        const collider = collider_group.getObjectByName(`${left_right}-${index}`);
+        console.log(collider_group);
+        const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z);
+        const world = rel.clone();
+        collider_group.localToWorld(world);
+        const parent = obj.parent ?? ctx.scene;
+        parent.updateWorldMatrix(true, true);
+        parent.worldToLocal(world);
+        obj.position.copy(world);
+        console.log(world);
+        //model.position.set(collider.position.x, collider.position.y, collider.position.z);
+    });
+}
+
 let gui;
 const ctx = createCtx();
 init_model2(ctx);
@@ -401,6 +427,8 @@ init_raycaster(ctx);
 init_lighting(ctx);
 init_gui();
 console.log(ctx);
+init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
+init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
 
 function animate() {
     requestAnimationFrame(animate);
@@ -425,6 +453,7 @@ function animate() {
       init_lighting(ctx);
       init_gui();
       init_collider(ctx, init_settings.additional_deck );
+
     }
 
     if (ctx.model_load_done_flag === true) {
