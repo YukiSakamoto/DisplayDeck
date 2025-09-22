@@ -36,6 +36,14 @@ function placeNextTo(prev, next, gap = 0) {
   next.updateWorldMatrix(true,true);
 }
 
+function angleDiff(a, b) {
+  const TWO_PI = Math.PI * 2;
+  let d = (a - b) % TWO_PI;
+  if (d >  Math.PI) d -= TWO_PI;
+  if (d <= -Math.PI) d += TWO_PI;
+  return d;
+}
+
 function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true } = {}) {
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -401,21 +409,38 @@ function init_equipments(ctx, model_file, object_id, left_right = "left", index 
         const model = gltf.scene;
         model.scale.set(10,10,10);
         reg.add(ctx, object_id, model);
+        model.userData.initY ??= model.rotation.y;
 
-        const obj = reg.get(ctx, object_id);
-        const collider_group = reg.get(ctx, "Collider");
-        const collider = collider_group.getObjectByName(`${left_right}-${index}`);
-        console.log(collider_group);
-        const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z);
-        const world = rel.clone();
-        collider_group.localToWorld(world);
-        const parent = obj.parent ?? ctx.scene;
-        parent.updateWorldMatrix(true, true);
-        parent.worldToLocal(world);
-        obj.position.copy(world);
-        console.log(world);
-        //model.position.set(collider.position.x, collider.position.y, collider.position.z);
+        place_equipments(ctx, object_id, left_right, index);
     });
+}
+
+function place_equipments(ctx, object_id, left_right, index) {
+    const obj = reg.get(ctx, object_id);
+
+    const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
+    if (left_right == 'right') {
+      if (dRad != 0) {
+        obj.rotateY(Math.PI);
+      }
+      
+    } else if (left_right == 'left') {
+      if (dRad != Math.PI) {
+        obj.rotateY(Math.PI);
+      }
+    }
+    let z_position_modifier = 2.0;  //XXX this is dirty HACK
+    const collider_group = reg.get(ctx, "Collider");
+    const collider = collider_group.getObjectByName(`${left_right}-${index}`);
+    const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z / z_position_modifier);
+    const world = rel.clone();
+    collider_group.localToWorld(world);
+    const parent = obj.parent ?? ctx.scene;
+    parent.updateWorldMatrix(true, true);
+    parent.worldToLocal(world);
+    obj.position.copy(world);
+    //obj.position.set(collider.position.x, collider.position.y, collider.position.z);
+    
 }
 
 let gui;
