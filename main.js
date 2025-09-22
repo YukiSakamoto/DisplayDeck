@@ -25,6 +25,7 @@ const init_settings = {
 
 const deck_visibility_settings = new Map();
 const deck_settings = new Map();
+const equipment_position_settings = new Map();
 
 function placeNextTo(prev, next, gap = 0) {
   prev.updateWorldMatrix(true, true);
@@ -85,7 +86,24 @@ function replaceWithLambertKeepColor(root, { keepMap = false, keepAlpha = true }
   });
 }
 
-function init_gui() {
+function init_gui(equipment_list) {
+    function makeAdapter(key, selMap, onChange) {
+      const ensure = () => selMap.get(key) ?? (selMap.set(key, {side: 'left', index: 0}), selMap.get(key));
+      return {
+        get side() { return ensure().side; },
+        set side(v) {
+          const cur = ensure(); 
+          const next = { ...cur, side: v};
+          selMap.set(key, next); onChange(next);
+        },
+        get index() { return ensure().index;},
+        set index(v) {
+          const cur = ensure();
+          const next = {...cur, index: (v|0)};
+          selMap.set(key, next); onChange(next);
+        },
+      };
+    }
     gui = new GUI();
     gui.add(display_settings, 'show_grid_helper');
     gui.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
@@ -106,7 +124,19 @@ function init_gui() {
             deck_visibility_settings.set(key, v);
         });
     };
+
+    const equipment_position_folder = gui.addFolder('equipment position');
+    console.log(equipment_position_settings);
+    for (const [key, val] of equipment_position_settings) {
+      const obj_folder = equipment_position_folder.addFolder(key);
+      const adapter = makeAdapter(key, equipment_position_settings, (entry) => {
+        place_equipments(ctx, key, entry.side, entry.index);
+      })
+      obj_folder.add(adapter, 'side', ['left', 'right']).name('Side')
+      obj_folder.add(adapter, 'index', 0, 18, 1).name('Index')
+    };
 };
+
 
 function createCtx() {
   // scene
@@ -410,24 +440,24 @@ function init_equipments(ctx, model_file, object_id, left_right = "left", index 
         model.scale.set(10,10,10);
         reg.add(ctx, object_id, model);
         model.userData.initY ??= model.rotation.y;
+        model.userData.rotate ??= 0;
 
         place_equipments(ctx, object_id, left_right, index);
     });
+    equipment_position_settings.set(object_id, {side: left_right, index: index});
 }
 
 function place_equipments(ctx, object_id, left_right, index) {
+  try {
     const obj = reg.get(ctx, object_id);
 
     const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
-    if (left_right == 'right') {
-      if (dRad != 0) {
-        obj.rotateY(Math.PI);
-      }
-      
-    } else if (left_right == 'left') {
-      if (dRad != Math.PI) {
-        obj.rotateY(Math.PI);
-      }
+    if (left_right == 'right' && obj.userData.rotate % 2 == 1) {
+      obj.rotateY(Math.PI);
+      obj.userData.rotate += 1;
+    } else if (left_right == 'left' && obj.userData.rotate % 2 == 0) {
+      obj.rotateY(Math.PI);
+      obj.userData.rotate += 1;
     }
     let z_position_modifier = 2.0;  //XXX this is dirty HACK
     const collider_group = reg.get(ctx, "Collider");
@@ -440,7 +470,9 @@ function place_equipments(ctx, object_id, left_right, index) {
     parent.worldToLocal(world);
     obj.position.copy(world);
     //obj.position.set(collider.position.x, collider.position.y, collider.position.z);
-    
+  } catch {
+    // pass;
+  }
 }
 
 let gui;
@@ -450,10 +482,11 @@ init_helper(ctx);
 init_collider(ctx);
 init_raycaster(ctx);
 init_lighting(ctx);
-init_gui();
 console.log(ctx);
 init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
 init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
+init_gui();
+
 
 function animate() {
     requestAnimationFrame(animate);
