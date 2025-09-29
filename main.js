@@ -52,27 +52,27 @@ function init_gui(equipment_list) {
     }
     const gui_obj = new GUI();
     gui_obj.add(display_settings, 'show_grid_helper');
-    gui_obj.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
-    gui_obj.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
-    gui_obj.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
-    gui_obj.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
-    gui_obj.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
+    const gui_light_folder = gui_obj.addFolder('Light Settings');
+    gui_light_folder.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
+    gui_light_folder.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
+    gui_light_folder.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
+    gui_light_folder.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
+    gui_light_folder.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
 
     const init_gui_folder = gui_obj.addFolder('Initialize');
     init_gui_folder.add(init_settings, 'additional_deck', 0, 3, 1);
     init_gui_folder.add(init_settings, 'initialize');
 
-    const deck = gui_obj.addFolder('Visibility');
+    const deck_folder = gui_obj.addFolder('Visibility');
     const params = {};
     for (const  [key, val] of deck_visibility_settings) {
         params[key] = val;
-        deck.add(params, key).onChange((v) => {
+        deck_folder.add(params, key).onChange((v) => {
             deck_visibility_settings.set(key, v);
         });
     };
 
     const equipment_position_folder = gui_obj.addFolder('equipment position');
-    console.log(equipment_position_settings);
     for (const [key, val] of equipment_position_settings) {
       const obj_folder = equipment_position_folder.addFolder(key);
       const adapter = makeAdapter(key, equipment_position_settings, (entry) => {
@@ -229,59 +229,59 @@ function place_equipments(ctx, object_id, left_right, index) {
 
 let gui;
 const ctx = createCtx();
-init_model2(ctx);
-init_helper(ctx);
-init_collider(ctx);
-init_raycaster(ctx);
-init_lighting(ctx, display_settings.ambient_light_intensity, display_settings.directional_light_intensity);
-console.log(ctx);
-init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
-init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
+setup();
 gui = init_gui();
 
-function setup() {
+function setup(additional_deck = 1) {
+  init_model2(ctx, additional_deck);
+  init_helper(ctx);
+  init_collider(ctx, additional_deck);
+  init_raycaster(ctx);
+  init_lighting(ctx, display_settings.ambient_light_intensity, display_settings.directional_light_intensity);
+  init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
+  init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
+  init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
+  gui = init_gui();
+}
 
+function cleanup() {
+  gui.destroy();
+  deck_visibility_settings.clear();
+  reg.remove_all(ctx);
+  need_initialize = false;
 }
 
 
 function animate() {
-    requestAnimationFrame(animate);
-    let ambient_light = reg.get(ctx, "light:ambient");
-    ambient_light.intensity = display_settings.ambient_light_intensity;
+  requestAnimationFrame(animate);
 
-    let directional_light = reg.get(ctx, "light:directional");
-    directional_light.intensity = display_settings.directional_light_intensity;
-    directional_light.position.x = display_settings.directional_light_position_x;
-    directional_light.position.y = display_settings.directional_light_position_y;
-    directional_light.position.z = display_settings.directional_light_position_z;
+  // light settings
+  let ambient_light = reg.get(ctx, "light:ambient");
+  ambient_light.intensity = display_settings.ambient_light_intensity;
+  let directional_light = reg.get(ctx, "light:directional");
+  directional_light.intensity = display_settings.directional_light_intensity;
+  directional_light.position.x = display_settings.directional_light_position_x;
+  directional_light.position.y = display_settings.directional_light_position_y;
+  directional_light.position.z = display_settings.directional_light_position_z;
 
-    if (need_initialize) {
-      gui.destroy();
-      deck_visibility_settings.clear();
-      reg.remove_all(ctx);
-      need_initialize = false;
-      console.log('update');
-      console.log('remove done');
-      init_model2(ctx,init_settings.additional_deck );
-      init_helper(ctx);
-      init_lighting(ctx);
-      init_gui();
-      init_collider(ctx, init_settings.additional_deck );
+  // Reset
+  if (need_initialize) {
+    cleanup();
+    setup(display_settings.n_additional_deck);
+  }
+  // Arm position
+  if (ctx.model_load_done_flag === true) {
+      reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
+      deck_visibility_settings.forEach((val, key) => {
+          reg.get(ctx, key).visible = val;
+      });
+  }
+  if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
+    console.log("mouse moved");
+    point_collider(ctx, "Collider");
+  }
 
-    }
-
-    if (ctx.model_load_done_flag === true) {
-        reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
-        deck_visibility_settings.forEach((val, key) => {
-            reg.get(ctx, key).visible = val;
-        });
-    }
-    if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
-      console.log("mouse moved");
-      point_collider(ctx, "Collider");
-    }
-
-    ctx.renderer.render(ctx.scene, ctx.camera);
+  ctx.renderer.render(ctx.scene, ctx.camera);
 }
 
 animate();
