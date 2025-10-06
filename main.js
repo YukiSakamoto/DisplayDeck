@@ -32,6 +32,42 @@ const deck_visibility_settings = new Map();
 const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
+function createControlTable() {
+  const row = tableBody.insertRow();
+  row.dataset.objectIndex = 0;
+
+  row.insertCell().textContent = 'test';
+  const visibilityCell = row.insertCell();
+  const visibilityInput = document.createElement('input');
+  visibilityInput.type = 'checkbox';
+  visibilityInput.checked = true;
+  visibilityInput.addEventListener('change', (e) => {
+  })
+  visibilityCell.appendChild(visibilityInput);
+
+  const lrCell = row.insertCell();
+  const lrSelect = document.createElement('select');
+  const lr_options = [
+    {name: 'left', value: 'left'},
+    {name: 'right', value: 'right'},
+  ];
+  let i = 0;
+  lr_options.forEach(options => {
+    const opt = document.createElement('option');
+    opt.value = options.value;
+    opt.textContent = options.name;
+    if (i == 0) {
+      opt.selected = true;
+    }
+    lrSelect.appendChild(opt);
+  });
+  lrSelect.addEventListener('change', (e) => {
+    const lr = parseInt(e.target.value);
+
+  });
+  lrCell.appendChild(lrSelect);
+}
+
 function init_gui(equipment_list) {
     function makeAdapter(key, selMap, onChange) {
       const ensure = () => selMap.get(key) ?? (selMap.set(key, {side: 'left', index: 0}), selMap.get(key));
@@ -84,20 +120,38 @@ function init_gui(equipment_list) {
     return gui_obj;
 };
 
+const objects = [];
+const threeArea = document.getElementById('three-area');
+console.log(threeArea);
+const tableBody = document.querySelector('#object-control-table tbody');
+
 
 function createCtx() {
   // scene
   const scene = new THREE.Scene();
   //camera
+  //const camera = new THREE.PerspectiveCamera(
+  //  75, window.innerWidth / window.innerHeight, 0.1, 1000
+  //);
   const camera = new THREE.PerspectiveCamera(
-    75, window.innerWidth / window.innerHeight, 0.1, 1000
+    75, threeArea.clientWidth / threeArea.clientHeight, 0.1, 1000
   );
   camera.position.z = 10;
   camera.position.set(-10, -20, 20);
   // renderer
   const renderer = new THREE.WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+  //renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(threeArea.clientWidth, threeArea.clientHeight);
+  //document.body.appendChild(renderer.domElement);
+  threeArea.appendChild(renderer.domElement);
+  window.addEventListener('resize', () => {
+    const width = threeArea.clientWidth;
+    const height = threeArea.clientHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  });
+  
   // handler
   //ambient_light
   const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
@@ -243,6 +297,7 @@ function setup(additional_deck = 1) {
   init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
   //init_equipments(ctx, './asset/655T_System_Shell_with_Plates.glb', 'plate_shell', 'right', 12);
   gui = init_gui();
+  createControlTable();
 }
 
 function cleanup() {

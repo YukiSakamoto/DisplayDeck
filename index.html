@@ -14,23 +14,63 @@
 	}
   </script>
   <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    /* 画面全体を上下に分割するコンテナ */
+    #container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
     }
-    h1 {
-      margin: 20px;
-      font-size: 2rem;
+    /* 3D表示エリア - 画面上半分 */
+    #three-area {
+        height: 50vh; /* 画面の高さの50% */
+        background-color: #f0f0f0;
+        position: relative; /* three.jsのcanvasを配置するため */
     }
-    p {
-      margin: 20px;
+    /* コントロールエリア - 画面下半分 */
+    #control-area {
+        height: 50vh; /* 画面の高さの50% */
+        overflow-y: auto; /* テーブルが大きくなってもスクロール可能に */
+        padding: 10px;
+        box-sizing: border-box;
+        background-color: #e0e0e0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+    }
+    input[type="number"] {
+        width: 50px;
     }
   </style>
 </head>
 <body>
-  <H1>
+  <!--H1>
 	Ardea
-  </H1>
+  </H1-->
+  <div id="container">
+    <div id="three-area">
+    </div>
+    <div id="control-area">
+      <h2>object control</h2>
+      <table id="object-control-table">
+        <thead>
+          <tr>
+            <th>object</th>
+            <th>display</th>
+            <th>left and right</th>
+            <th>index</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
