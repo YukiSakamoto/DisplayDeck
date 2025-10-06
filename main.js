@@ -241,6 +241,7 @@ function setup(additional_deck = 1) {
   init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
   init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
   init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
+  //init_equipments(ctx, './asset/655T_System_Shell_with_Plates.glb', 'plate_shell', 'right', 12);
   gui = init_gui();
 }
 
