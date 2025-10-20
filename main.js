@@ -32,19 +32,52 @@ const deck_visibility_settings = new Map();
 const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
-function createControlTable() {
+function insertControlTable(object_name, visible, lr, index) {
+  const reflect_position = function(elem) {
+    // この行の中のすべての要素を取得する。
+    const currentRow = elem.target.closest('tr');
+    if (currentRow) {
+      console.log(currentRow);
+      const objectName = currentRow.cells[0].textContent;
+      console.log(objectName);
+      let visible = null;
+      const visible_checkbox = currentRow.cells[1].querySelector('input[type="checkbox"]');
+      console.log(visible_checkbox);
+      if (visible_checkbox) {
+        visible = visible_checkbox.checked;
+      }
+      const lr_dropdown = currentRow.cells[2].querySelector('select');
+      let lr_value = null;
+      if (lr_dropdown) {
+        lr_value = lr_dropdown.value;
+      }
+      const index_dropdown = currentRow.cells[3].querySelector('select');
+      let index_value = null;
+      if (index_dropdown) {
+        index_value = index_dropdown.value;
+      }
+      console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
+      if (visible != null && lr_value != null && index_value != null) {
+        place_equipments(ctx, objectName, lr_value, index_value, visible);
+      }
+    }
+  };
+
   const row = tableBody.insertRow();
   row.dataset.objectIndex = 0;
 
-  row.insertCell().textContent = 'test';
+  row.insertCell().textContent = object_name;
+  // 表示・非表示のチェックボックスのセル
   const visibilityCell = row.insertCell();
   const visibilityInput = document.createElement('input');
   visibilityInput.type = 'checkbox';
-  visibilityInput.checked = true;
+  visibilityInput.checked = visible;
   visibilityInput.addEventListener('change', (e) => {
+    reflect_position(e);
   })
   visibilityCell.appendChild(visibilityInput);
 
+  // Left/Rightのドロップボックスのセル
   const lrCell = row.insertCell();
   const lrSelect = document.createElement('select');
   const lr_options = [
@@ -53,19 +86,33 @@ function createControlTable() {
   ];
   let i = 0;
   lr_options.forEach(options => {
+    // 新しいオプション（ドロップダウン内の1要素）
     const opt = document.createElement('option');
+    // 新しいオプションのvalueとして、lr_optionsの中のvalueの値を保存しておく
     opt.value = options.value;
     opt.textContent = options.name;
-    if (i == 0) {
+    if (options.value == lr) {
       opt.selected = true;
     }
     lrSelect.appendChild(opt);
   });
-  lrSelect.addEventListener('change', (e) => {
-    const lr = parseInt(e.target.value);
-
-  });
+  lrSelect.addEventListener('change', (e) => { reflect_position(e);});
   lrCell.appendChild(lrSelect);
+
+  // 板の中での位置の数字を選択するところ
+  const posCell = row.insertCell();
+  const posSelect = document.createElement('select');
+  for(let i = 0; i < 18; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i}`;
+    if (i == index) {
+      opt.selected = true;
+    }
+    posSelect.appendChild(opt);
+  }
+  posSelect.addEventListener('change', (e) => { reflect_position(e); });
+  posCell.appendChild(posSelect);
 }
 
 function init_gui(equipment_list) {
@@ -108,15 +155,15 @@ function init_gui(equipment_list) {
         });
     };
 
-    const equipment_position_folder = gui_obj.addFolder('equipment position');
-    for (const [key, val] of equipment_position_settings) {
-      const obj_folder = equipment_position_folder.addFolder(key);
-      const adapter = makeAdapter(key, equipment_position_settings, (entry) => {
-        place_equipments(ctx, key, entry.side, entry.index);
-      })
-      obj_folder.add(adapter, 'side', ['left', 'right']).name('Side')
-      obj_folder.add(adapter, 'index', 0, 18, 1).name('Index')
-    };
+    //const equipment_position_folder = gui_obj.addFolder('equipment position');
+    //for (const [key, val] of equipment_position_settings) {
+    //  const obj_folder = equipment_position_folder.addFolder(key);
+    //  const adapter = makeAdapter(key, equipment_position_settings, (entry) => {
+    //    place_equipments(ctx, key, entry.side, entry.index);
+    //  })
+    //  obj_folder.add(adapter, 'side', ['left', 'right']).name('Side')
+    //  obj_folder.add(adapter, 'index', 0, 18, 1).name('Index')
+    //};
     return gui_obj;
 };
 
@@ -251,11 +298,19 @@ function init_equipments(ctx, model_file, object_id, left_right = "left", index 
         place_equipments(ctx, object_id, left_right, index);
     });
     equipment_position_settings.set(object_id, {side: left_right, index: index});
+    insertControlTable(object_id, true, left_right, index);
 }
 
-function place_equipments(ctx, object_id, left_right, index) {
+function place_equipments(ctx, object_id, left_right, index, visible = true) {
   try {
     const obj = reg.get(ctx, object_id);
+    if (visible == false) {
+      obj.visible = false;
+      console.log(visible);
+      return;
+    } else {
+      obj.visible = true;
+    }
 
     const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
     if (left_right == 'right' && obj.userData.rotate % 2 == 1) {
@@ -297,13 +352,14 @@ function setup(additional_deck = 1) {
   init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
   //init_equipments(ctx, './asset/655T_System_Shell_with_Plates.glb', 'plate_shell', 'right', 12);
   gui = init_gui();
-  createControlTable();
+  //insertControlTable('peeler', true, 'left', 2);
 }
 
 function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
   reg.remove_all(ctx);
+  tableBody.innerHTML = '';
   need_initialize = false;
 }
 
