@@ -17,8 +17,44 @@ const display_settings = {
   directional_light_position_x: 1.0,
   directional_light_position_y: 2.0,
   directional_light_position_z: 3.0,
-
 };
+
+function side_lr2AB(side){
+  let lowercase = side.toLowerCase();
+  if ("Left".toLowerCase() === lowercase) {
+    return "A";
+  } else if ("Right".toLowerCase() === lowercase) {
+    return "B";
+  }
+  return null;
+}
+function side_AB2lr(side) {
+  let lowercase = side.toLowerCase();
+  if ("A".toLowerCase() === lowercase) {
+    return "left";
+  } else if ("B".toLowerCase() === lowercase) {
+    return "right";
+  }
+  return null;
+}
+
+const equipment_status = [
+  { 
+    id: "peeler", file: "./asset/Xpeel_v2.glb",
+    address: {  side: "left", position_index: 5,  },
+    //position_side: "A", position_index: 5,  
+  },
+  { 
+    id: "centrifuge", file: "./asset/Microplate_Centrifuge_v2.glb",
+    address: { side: "right", position_index: 6},
+  },
+  {
+    id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb",
+    address: { side: "left", position_index: 8},
+  },
+  //init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
+];
+
 
 let need_initialize = false;
 const init_settings = {
@@ -37,9 +73,9 @@ function insertControlTable(object_name, visible, lr, index) {
     // この行の中のすべての要素を取得する。
     const currentRow = elem.target.closest('tr');
     if (currentRow) {
-      console.log(currentRow);
+      //console.log(currentRow);
       const objectName = currentRow.cells[0].textContent;
-      console.log(objectName);
+      //console.log(objectName);
       let visible = null;
       const visible_checkbox = currentRow.cells[1].querySelector('input[type="checkbox"]');
       console.log(visible_checkbox);
@@ -59,6 +95,15 @@ function insertControlTable(object_name, visible, lr, index) {
       console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
       if (visible != null && lr_value != null && index_value != null) {
         place_equipments(ctx, objectName, lr_value, index_value, visible);
+
+        // 一元化したテーブルの方を書き換える
+        for(let i = 0; i < equipment_status.length; i++) {
+          if(equipment_status[i].id == objectName) {
+            equipment_status[i].address.side = lr_value;
+            equipment_status[i].address.position_index = index_value;
+          }
+        }
+        console.log(equipment_status);
       }
     }
   };
@@ -347,9 +392,16 @@ function setup(additional_deck = 1) {
   init_collider(ctx, additional_deck);
   init_raycaster(ctx);
   init_lighting(ctx, display_settings.ambient_light_intensity, display_settings.directional_light_intensity);
-  init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
-  init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
-  init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
+  for (let i = 0; i < equipment_status.length; i++) {
+    init_equipments(
+      ctx, equipment_status[i].file, equipment_status[i].id, 
+      equipment_status[i].address.side, equipment_status[i].address.position_index
+    );
+  }
+  //init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
+  //init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
+  //init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
+
   //init_equipments(ctx, './asset/655T_System_Shell_with_Plates.glb', 'plate_shell', 'right', 12);
   gui = init_gui();
   //insertControlTable('peeler', true, 'left', 2);
