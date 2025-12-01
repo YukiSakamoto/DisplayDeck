@@ -41,18 +41,16 @@ function side_AB2lr(side) {
 const equipment_status = [
   { 
     id: "peeler", file: "./asset/Xpeel_v2.glb",
-    address: {  side: "left", position_index: 5,  },
-    //position_side: "A", position_index: 5,  
+    address: {  side: "A", position_index: 5,  },
   },
   { 
     id: "centrifuge", file: "./asset/Microplate_Centrifuge_v2.glb",
-    address: { side: "right", position_index: 6},
+    address: { side: "B", position_index: 6},
   },
   {
     id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb",
-    address: { side: "left", position_index: 8},
+    address: { side: "A", position_index: 8},
   },
-  //init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
 ];
 
 
@@ -69,11 +67,12 @@ const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
 function insertControlTable(object_name, visible, lr, index) {
+  // テーブルが操作された時に、モデルの位置を反映する
   const reflect_position = function(elem) {
     // この行の中のすべての要素を取得する。
     const currentRow = elem.target.closest('tr');
     if (currentRow) {
-      //console.log(currentRow);
+      console.log(currentRow);
       const objectName = currentRow.cells[0].textContent;
       //console.log(objectName);
       let visible = null;
@@ -126,8 +125,10 @@ function insertControlTable(object_name, visible, lr, index) {
   const lrCell = row.insertCell();
   const lrSelect = document.createElement('select');
   const lr_options = [
-    {name: 'left', value: 'left'},
-    {name: 'right', value: 'right'},
+    //{name: 'left', value: 'left'},
+    //{name: 'right', value: 'right'},
+    {name: 'A', value: 'A'},
+    {name: 'B', value: 'B'},
   ];
   let i = 0;
   lr_options.forEach(options => {
@@ -200,15 +201,6 @@ function init_gui(equipment_list) {
         });
     };
 
-    //const equipment_position_folder = gui_obj.addFolder('equipment position');
-    //for (const [key, val] of equipment_position_settings) {
-    //  const obj_folder = equipment_position_folder.addFolder(key);
-    //  const adapter = makeAdapter(key, equipment_position_settings, (entry) => {
-    //    place_equipments(ctx, key, entry.side, entry.index);
-    //  })
-    //  obj_folder.add(adapter, 'side', ['left', 'right']).name('Side')
-    //  obj_folder.add(adapter, 'index', 0, 18, 1).name('Index')
-    //};
     return gui_obj;
 };
 
@@ -340,14 +332,18 @@ function init_equipments(ctx, model_file, object_id, left_right = "left", index 
         model.userData.initY ??= model.rotation.y;
         model.userData.rotate ??= 0;
 
+        console.log(left_right);
+        // モデルを配置する
         place_equipments(ctx, object_id, left_right, index);
     });
-    equipment_position_settings.set(object_id, {side: left_right, index: index});
+    //equipment_position_settings.set(object_id, {side: left_right, index: index});
+    // 画面下部の登録に表示する。
     insertControlTable(object_id, true, left_right, index);
 }
 
 function place_equipments(ctx, object_id, left_right, index, visible = true) {
   try {
+    console.log(object_id, left_right, index, visible);
     const obj = reg.get(ctx, object_id);
     if (visible == false) {
       obj.visible = false;
@@ -363,6 +359,12 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
       obj.userData.rotate += 1;
     } else if (left_right == 'left' && obj.userData.rotate % 2 == 0) {
       obj.rotateY(Math.PI);
+      obj.userData.rotate += 1;
+    } else if (left_right == 'B' && obj.userData.rotate % 2 == 1) {
+      obj.rotateY(Math.PI); // left
+      obj.userData.rotate += 1;
+    } else if (left_right == 'A' && obj.userData.rotate % 2 == 0) {
+      obj.rotateY(Math.PI); // right
       obj.userData.rotate += 1;
     }
     let z_position_modifier = 2.0;  //XXX this is dirty HACK
@@ -387,24 +389,22 @@ setup();
 gui = init_gui();
 
 function setup(additional_deck = 1) {
+  // まずはArdeaのモデルをセットアップする
   init_model2(ctx, additional_deck);
   init_helper(ctx);
+  // 天板を直接選ぶのが難しいので、天板にコライダー（衝突判定用のオブジェクト）を作る
   init_collider(ctx, additional_deck);
   init_raycaster(ctx);
   init_lighting(ctx, display_settings.ambient_light_intensity, display_settings.directional_light_intensity);
+
+  // 実験機器のセットアップ
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(
       ctx, equipment_status[i].file, equipment_status[i].id, 
       equipment_status[i].address.side, equipment_status[i].address.position_index
     );
   }
-  //init_equipments(ctx, './asset/Xpeel_v2.glb', "peeler", 'left', 2);
-  //init_equipments(ctx, './asset/Microplate_Centrifuge_v2.glb', "centifuge", 'right', 4);
-  //init_equipments(ctx, './asset/automated_thermal_cycler.glb', 'thermal_cycler', 'right', 8);
-
-  //init_equipments(ctx, './asset/655T_System_Shell_with_Plates.glb', 'plate_shell', 'right', 12);
   gui = init_gui();
-  //insertControlTable('peeler', true, 'left', 2);
 }
 
 function cleanup() {

@@ -123,13 +123,12 @@ export function init_collider(ctx, n_additional_deck = 1) {
         new THREE.MeshBasicMaterial({transparent: false, opacity: 0})
       );
       top_panel_mesh.position.set(x, top_panel[i].y, top_panel[i].z);
-      top_panel_mesh.name = `${i == 0 ? "left":"right"}-${j}`;
+      top_panel_mesh.name = `${i == 0 ? "A":"B"}-${j}`;
       top_panel_mesh.scale.set(dx, top_panel[i].height, top_panel[i].depth);
       top_panel_mesh.userData.index = j;
       collider_group.add(top_panel_mesh);
       x += dx;
     }
-    //top_panel_mesh.scale.set(top_panel[i].width, top_panel[i].height, top_panel[i].depth);
   }
   let collider_box = new THREE.Box3().setFromObject(collider_group);
   let center = new THREE.Vector3();
