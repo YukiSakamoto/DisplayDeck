@@ -96,8 +96,10 @@ export function init_raycaster(ctx) {
   ctx.raycaster = raycaster;
   ctx.pointer = pointer;
   function onPointerMove(event) {
-    ctx.pointer.x =  (event.clientX / window.innerWidth) * 2 - 1;
-    ctx.pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const rect = ctx.renderer.domElement.getBoundingClientRect();
+    
+    ctx.pointer.x =  ( (event.clientX - rect.left) / rect.width) * 2 - 1;
+    ctx.pointer.y = -( (event.clientY - rect.top) / rect.height) * 2 + 1;
     ctx.mousemoved_flag = true;
   }
   window.addEventListener('pointermove', onPointerMove);
