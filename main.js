@@ -51,6 +51,10 @@ const equipment_status = [
     id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb",
     address: { side: "A", position_index: 8},
   },
+  {
+    id: "sealer", file: "./asset/275-HS4T00-00.glb",
+    address: {side: "B", position_index: 12},
+  }
 ];
 
 
