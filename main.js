@@ -40,19 +40,19 @@ function side_AB2lr(side) {
 
 const equipment_status = [
   { 
-    id: "peeler", file: "./asset/Xpeel_v2.glb",
+    id: "peeler", file: "./asset/Xpeel_v2.glb", width: 2,
     address: {  side: "A", position_index: 5,  },
   },
   { 
-    id: "centrifuge", file: "./asset/Microplate_Centrifuge_v2.glb",
+    id: "centrifuge", file: "./asset/Microplate_Centrifuge_v2.glb", width: 2,
     address: { side: "B", position_index: 6},
   },
   {
-    id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb",
+    id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb", width: 1,
     address: { side: "A", position_index: 8},
   },
   {
-    id: "sealer", file: "./asset/275-HS4T00-00.glb",
+    id: "sealer", file: "./asset/275-HS4T00-00.glb", width: 1,
     address: {side: "B", position_index: 12},
   }
 ];
@@ -70,7 +70,7 @@ const deck_visibility_settings = new Map();
 const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
-function insertControlTable(object_name, visible, lr, index) {
+function insertControlTable(object_name, visible, lr, index, width) {
   // テーブルが操作された時に、モデルの位置を反映する
   const reflect_position = function(elem) {
     // この行の中のすべての要素を取得する。
@@ -97,7 +97,7 @@ function insertControlTable(object_name, visible, lr, index) {
       }
       console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
       if (visible != null && lr_value != null && index_value != null) {
-        place_equipments(ctx, objectName, lr_value, index_value, visible);
+        place_equipments(ctx, objectName, lr_value, index_value, width, visible);
 
         // 一元化したテーブルの方を書き換える
         for(let i = 0; i < equipment_status.length; i++) {
@@ -161,6 +161,9 @@ function insertControlTable(object_name, visible, lr, index) {
     }
     posSelect.appendChild(opt);
   }
+  // 機器の幅（区画何枚分を取るか）
+  const widthCell = row.insertCell();
+  widthCell.textContent = width;
   posSelect.addEventListener('change', (e) => { reflect_position(e); });
   posCell.appendChild(posSelect);
 }
@@ -338,16 +341,15 @@ function init_equipments(ctx, model_file, object_id, left_right = "left", index 
 
         console.log(left_right);
         // モデルを配置する
-        place_equipments(ctx, object_id, left_right, index);
+        place_equipments(ctx, object_id, left_right, index, width);
     });
-    //equipment_position_settings.set(object_id, {side: left_right, index: index});
     // 画面下部の登録に表示する。
-    insertControlTable(object_id, true, left_right, index);
+    insertControlTable(object_id, true, left_right, index, width);
 }
 
-function place_equipments(ctx, object_id, left_right, index, visible = true) {
+function place_equipments(ctx, object_id, left_right, index, width = 1, visible = true) {
   try {
-    console.log(object_id, left_right, index, visible);
+    console.log(object_id, left_right, index, visible, width);
     const obj = reg.get(ctx, object_id);
     if (visible == false) {
       obj.visible = false;
@@ -356,7 +358,8 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
     } else {
       obj.visible = true;
     }
-
+    width = Number(width);
+    index = Number(index);
     const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
     if (left_right == 'right' && obj.userData.rotate % 2 == 1) {
       obj.rotateY(Math.PI);
@@ -374,14 +377,29 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
     let z_position_modifier = 2.0;  //XXX this is dirty HACK
     const collider_group = reg.get(ctx, "Collider");
     const collider = collider_group.getObjectByName(`${left_right}-${index}`);
-    const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z / z_position_modifier);
+    let x_pos = collider.position.x;
+    if (width % 2 == 0) {
+      // 位置は、原則、オブジェクトの真ん中が乗っかる板の番号。
+      // もし偶数のときは、その次のパネルとの中央位置を扱う方が良い。
+      const collider2 = collider_group.getObjectByName(`${left_right}-${index + 1}`);
+      let x_pos2 = collider2.position.x;
+      console.log(`${left_right}-${index + 1}`);
+      console.log('aaaaa');
+      console.log(collider2);
+      console.log('bbbbb');
+      x_pos = (x_pos + x_pos2) / 2;
+      console.log(`overwrite: ${x_pos}`);
+    }
+    //const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z / z_position_modifier);
+    const rel = new THREE.Vector3(x_pos, collider.position.y, collider.position.z / z_position_modifier);
+    console.log(`position ${collider.position.x}, ${collider.position.y}, ${collider.position.z}`);
     const world = rel.clone();
     collider_group.localToWorld(world);
     const parent = obj.parent ?? ctx.scene;
     parent.updateWorldMatrix(true, true);
     parent.worldToLocal(world);
     obj.position.copy(world);
-    //obj.position.set(collider.position.x, collider.position.y, collider.position.z);
+    
   } catch {
     // pass;
   }
@@ -405,7 +423,8 @@ function setup(additional_deck = 1) {
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(
       ctx, equipment_status[i].file, equipment_status[i].id, 
-      equipment_status[i].address.side, equipment_status[i].address.position_index
+      equipment_status[i].address.side, equipment_status[i].address.position_index,
+      equipment_status[i].width
     );
   }
   gui = init_gui();
