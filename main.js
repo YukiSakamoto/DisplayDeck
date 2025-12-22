@@ -41,23 +41,23 @@ function side_AB2lr(side) {
 const equipment_status = [
   { 
     id: "peeler", 
-    object_attribute: {file: "./asset/Xpeel_v2.glb", width: 2, offset: 2},
+    object_attribute: {file: "./asset/Xpeel_v2.glb", width: 2, offset_x: 0, offset_z: 2},
     address: {  side: "A", position_index: 5,  },
     sila2_uri: {ip: "100.84.15.10", port: 8080}
   },
   { 
     id: "centrifuge", 
-    object_attribute: {file: "./asset/Microplate_Centrifuge_v2.glb", width: 2 },
+    object_attribute: {file: "./asset/Microplate_Centrifuge_v2.glb", width: 2, offset_z: 3},
     address: { side: "B", position_index: 6},
   },
   {
     id: "thermal_cycler", 
-    object_attribute: {file: "./asset/automated_thermal_cycler.glb", width: 1 },
+    object_attribute: {file: "./asset/automated_thermal_cycler.glb", width: 1, offset_z: 2 },
     address: { side: "A", position_index: 8},
   },
   {
     id: "sealer", 
-    object_attribute: {file: "./asset/275-HS4T00-00.glb", width: 1,},
+    object_attribute: {file: "./asset/275-HS4T00-00.glb", width: 1, offset_z: 2},
     address: {side: "B", position_index: 12},
   }
 ];
@@ -345,10 +345,10 @@ function init_equipments(ctx, equipment_info) {
   loader.load(equipment_info.object_attribute.file, (gltf) => {
     const model = gltf.scene;
     model.scale.set(10,10,10);
-    reg.add(ctx, equipment_info.id, model);
     model.userData.initY ??= model.rotation.y;
     model.userData.rotate ??= 0;
     model.userData.object_attribute = equipment_info.object_attribute;
+    reg.add(ctx, equipment_info.id, model);
     // モデルを配置する
     place_equipments(ctx, equipment_info.id, left_right, index);
   });
@@ -383,7 +383,14 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
       obj.rotateY(Math.PI); // right
       obj.userData.rotate += 1;
     }
-    let z_position_modifier = 2.0;  //XXX this is dirty HACK
+
+    let offset_z = obj.userData.object_attribute.offset_z ?? 0;
+    let offset_x = obj.userData.object_attribute.offset_x ?? 0;
+    console.log(`${object_id} placement ${offset_z} ${offset_x}`);
+    if (left_right == 'A' || left_right == 'left') {
+      offset_z *= -1;
+    }
+
     const collider_group = reg.get(ctx, "Collider");
     const collider = collider_group.getObjectByName(`${left_right}-${index}`);
     let x_pos = collider.position.x;
@@ -392,11 +399,9 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
       // もし偶数のときは、その次のパネルとの中央位置を扱う方が良い。
       const collider2 = collider_group.getObjectByName(`${left_right}-${index + 1}`);
       let x_pos2 = collider2.position.x;
-      //console.log(`${left_right}-${index + 1}`);
       x_pos = (x_pos + x_pos2) / 2;
     }
-    //const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z / z_position_modifier);
-    const rel = new THREE.Vector3(x_pos, collider.position.y, collider.position.z / z_position_modifier);
+    const rel = new THREE.Vector3(x_pos + offset_x, collider.position.y, collider.position.z + offset_z);
     console.log(`position ${collider.position.x}, ${collider.position.y}, ${collider.position.z}`);
     const world = rel.clone();
     collider_group.localToWorld(world);
