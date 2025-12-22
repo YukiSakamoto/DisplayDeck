@@ -102,7 +102,7 @@ function insertControlTable(object_name, visible, lr, index, width) {
       }
       console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
       if (visible != null && lr_value != null && index_value != null) {
-        place_equipments(ctx, objectName, lr_value, index_value, width, visible);
+        place_equipments(ctx, objectName, lr_value, index_value, visible);
 
         // 一元化したテーブルの方を書き換える
         for(let i = 0; i < equipment_status.length; i++) {
@@ -348,16 +348,17 @@ function init_equipments(ctx, equipment_info) {
     reg.add(ctx, equipment_info.id, model);
     model.userData.initY ??= model.rotation.y;
     model.userData.rotate ??= 0;
+    model.userData.object_attribute = equipment_info.object_attribute;
     // モデルを配置する
-    place_equipments(ctx, equipment_info.id, left_right, index, width);
+    place_equipments(ctx, equipment_info.id, left_right, index);
   });
   // 画面下部の登録に表示する。
   insertControlTable(equipment_info.id, true, left_right, index, width);
 }
 
-function place_equipments(ctx, object_id, left_right, index, width = 1, visible = true) {
+function place_equipments(ctx, object_id, left_right, index, visible = true) {
   try {
-    console.log(object_id, left_right, index, visible, width);
+    //console.log(object_id, left_right, index, visible, width);
     const obj = reg.get(ctx, object_id);
     if (visible == false) {
       obj.visible = false;
@@ -366,7 +367,7 @@ function place_equipments(ctx, object_id, left_right, index, width = 1, visible 
     } else {
       obj.visible = true;
     }
-    width = Number(width);
+    const width = obj.userData.object_attribute.width ?? 1;
     index = Number(index);
     const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
     if (left_right == 'right' && obj.userData.rotate % 2 == 1) {
