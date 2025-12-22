@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+//import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+//import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import GUI from 'lil-gui';
 import { placeNextTo,angleDiff, replaceWithLambertKeepColor } from './utils.js'
 import { 
@@ -40,19 +40,24 @@ function side_AB2lr(side) {
 
 const equipment_status = [
   { 
-    id: "peeler", file: "./asset/Xpeel_v2.glb", width: 2,
+    id: "peeler", 
+    object_attribute: {file: "./asset/Xpeel_v2.glb", width: 2, offset: 2},
     address: {  side: "A", position_index: 5,  },
+    sila2_uri: {ip: "100.84.15.10", port: 8080}
   },
   { 
-    id: "centrifuge", file: "./asset/Microplate_Centrifuge_v2.glb", width: 2,
+    id: "centrifuge", 
+    object_attribute: {file: "./asset/Microplate_Centrifuge_v2.glb", width: 2 },
     address: { side: "B", position_index: 6},
   },
   {
-    id: "thermal_cycler", file: "./asset/automated_thermal_cycler.glb", width: 1,
+    id: "thermal_cycler", 
+    object_attribute: {file: "./asset/automated_thermal_cycler.glb", width: 1 },
     address: { side: "A", position_index: 8},
   },
   {
-    id: "sealer", file: "./asset/275-HS4T00-00.glb", width: 1,
+    id: "sealer", 
+    object_attribute: {file: "./asset/275-HS4T00-00.glb", width: 1,},
     address: {side: "B", position_index: 12},
   }
 ];
@@ -330,21 +335,24 @@ function init_model2(ctx, n_additional_deck = 1) {
     deck_settings.set("arm_position", 0);
 }
 
-function init_equipments(ctx, model_file, object_id, left_right = "left", index = 0, width = 1) {
-    const loader = new GLTFLoader();
-    loader.load(model_file, (gltf) => {
-        const model = gltf.scene;
-        model.scale.set(10,10,10);
-        reg.add(ctx, object_id, model);
-        model.userData.initY ??= model.rotation.y;
-        model.userData.rotate ??= 0;
+function init_equipments(ctx, equipment_info) {
+  const loader = new GLTFLoader();
+  const left_right = equipment_info.address.side;
+  const index = equipment_info.address.position_index;
+  const width = equipment_info.object_attribute.width;
 
-        console.log(left_right);
-        // モデルを配置する
-        place_equipments(ctx, object_id, left_right, index, width);
-    });
-    // 画面下部の登録に表示する。
-    insertControlTable(object_id, true, left_right, index, width);
+  console.log(equipment_info);
+  loader.load(equipment_info.object_attribute.file, (gltf) => {
+    const model = gltf.scene;
+    model.scale.set(10,10,10);
+    reg.add(ctx, equipment_info.id, model);
+    model.userData.initY ??= model.rotation.y;
+    model.userData.rotate ??= 0;
+    // モデルを配置する
+    place_equipments(ctx, equipment_info.id, left_right, index, width);
+  });
+  // 画面下部の登録に表示する。
+  insertControlTable(equipment_info.id, true, left_right, index, width);
 }
 
 function place_equipments(ctx, object_id, left_right, index, width = 1, visible = true) {
@@ -383,12 +391,8 @@ function place_equipments(ctx, object_id, left_right, index, width = 1, visible 
       // もし偶数のときは、その次のパネルとの中央位置を扱う方が良い。
       const collider2 = collider_group.getObjectByName(`${left_right}-${index + 1}`);
       let x_pos2 = collider2.position.x;
-      console.log(`${left_right}-${index + 1}`);
-      console.log('aaaaa');
-      console.log(collider2);
-      console.log('bbbbb');
+      //console.log(`${left_right}-${index + 1}`);
       x_pos = (x_pos + x_pos2) / 2;
-      console.log(`overwrite: ${x_pos}`);
     }
     //const rel = new THREE.Vector3(collider.position.x, collider.position.y, collider.position.z / z_position_modifier);
     const rel = new THREE.Vector3(x_pos, collider.position.y, collider.position.z / z_position_modifier);
@@ -421,11 +425,7 @@ function setup(additional_deck = 1) {
 
   // 実験機器のセットアップ
   for (let i = 0; i < equipment_status.length; i++) {
-    init_equipments(
-      ctx, equipment_status[i].file, equipment_status[i].id, 
-      equipment_status[i].address.side, equipment_status[i].address.position_index,
-      equipment_status[i].width
-    );
+    init_equipments(ctx, equipment_status[i]);
   }
   gui = init_gui();
 }
