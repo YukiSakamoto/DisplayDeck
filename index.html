@@ -15,25 +15,45 @@
   </script>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    /* 画面全体を上下に分割するコンテナ */
+    /* 画面全体を左右に分割するコンテナ */
     #container {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         height: 100vh;
     }
-    /* 3D表示エリア - 画面上半分 */
+    /* 3D表示エリア - 画面右側 */
     #three-area {
-        height: 50vh; /* 画面の高さの50% */
+        flex: 1 1 0;
+        height: 100vh;
         background-color: #f0f0f0;
         position: relative; /* three.jsのcanvasを配置するため */
+        order: 1;
     }
-    /* コントロールエリア - 画面下半分 */
+    /* コントロールエリア - 画面左側 */
     #control-area {
-        height: 50vh; /* 画面の高さの50% */
+        flex: 0 0 50%;
+        max-width: 50%;
+        height: 100vh;
         overflow-y: auto; /* テーブルが大きくなってもスクロール可能に */
         padding: 10px;
         box-sizing: border-box;
         background-color: #e0e0e0;
+        order: 0;
+    }
+    .collapsed {
+      display: none;
+    }
+    #control-area.collapsed {
+      display: none;
+      flex: 0;
+      width: 0;
+      padding: 0;
+      margin: 0;
+    }
+    #toggle-control {
+        align-self: flex-start;
+        flex: 0 0 auto;
+        margin: 8px;
     }
     table {
         width: 100%;
@@ -56,6 +76,7 @@
   <div id="container">
     <div id="three-area">
     </div>
+    <button id="toggle-control">Toggle</button>
     <div id="control-area">
       <h2>object control</h2>
       <table id="object-control-table">
@@ -74,5 +95,13 @@
   </div>
   <script type="module" src="./main.js"></script>
 </body>
-</html>
 
+<script>
+  const controlArea=document.getElementById('control-area');
+  const toggleBtn = document.getElementById('toggle-control');
+  toggleBtn.addEventListener('click', () => {
+    controlArea.classList.toggle('collapsed');
+    window.dispatchEvent(new Event('resize'));
+  });
+</script>
+</html>
