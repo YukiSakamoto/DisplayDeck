@@ -418,7 +418,6 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
 let gui;
 const ctx = createCtx();
 setup();
-gui = init_gui();
 
 function setup(additional_deck = 1) {
   // まずはArdeaのモデルをセットアップする
@@ -433,6 +432,7 @@ function setup(additional_deck = 1) {
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(ctx, equipment_status[i]);
   }
+  // 右上のGUIのセットアップ
   gui = init_gui();
 }
 
@@ -460,7 +460,8 @@ function animate() {
   // Reset
   if (need_initialize) {
     cleanup();
-    setup(display_settings.n_additional_deck);
+    console.log('----- initialize -----');
+    setup(init_settings.additional_deck);
   }
   // Arm position
   if (ctx.model_load_done_flag === true) {
