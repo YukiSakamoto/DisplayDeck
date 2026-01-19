@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 //import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 //import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import GUI from 'lil-gui';
@@ -65,15 +65,13 @@ type EquipmentSila2Uri = {
   ip: string;
   port: number;
 };
-type EquipementStatus = {
+type EquipmentStatus = {
   id: string;
   object_attribute: EquipmentObjectAttribute;
   address: EquipmentAddress;
   sila2_uri?: EquipmentSila2Uri;
 }
-type EquipmentStatusList = EquipementStatus[];
-
-
+type EquipmentStatusList = EquipmentStatus[];
 const equipment_status: EquipmentStatusList = [
   { 
     id: "peeler", 
@@ -107,21 +105,23 @@ const init_settings = {
   },
 };
 
-const deck_visibility_settings = new Map();
+const deck_visibility_settings: Map<string,boolean> = new Map();
 const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
-function insertControlTable(object_name, visible, lr, index, width) {
+function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number) {
   // テーブルが操作された時に、モデルの位置を反映する
-  const reflect_position = function(elem) {
+  const reflect_position = function(elem: Event) {
     // この行の中のすべての要素を取得する。
-    const currentRow = elem.target.closest('tr');
+    const select = elem.currentTarget as HTMLSelectElement;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const currentRow = select.closest('tr');
     if (currentRow) {
       console.log(currentRow);
       const objectName = currentRow.cells[0].textContent;
       //console.log(objectName);
       let visible = null;
-      const visible_checkbox = currentRow.cells[1].querySelector('input[type="checkbox"]');
+      const visible_checkbox = currentRow.cells[1].querySelector<HTMLInputElement>('input[type="checkbox"]');
       console.log(visible_checkbox);
       if (visible_checkbox) {
         visible = visible_checkbox.checked;
@@ -132,9 +132,12 @@ function insertControlTable(object_name, visible, lr, index, width) {
         lr_value = lr_dropdown.value;
       }
       const index_dropdown = currentRow.cells[3].querySelector('select');
-      let index_value = null;
+      let index_value: number | null = null;
       if (index_dropdown) {
-        index_value = index_dropdown.value;
+        const parsed = Number(index_dropdown.value);
+        if (!Number.isNaN(parsed)) {
+          index_value = parsed;
+        }
       }
       console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
       if (visible != null && lr_value != null && index_value != null) {
@@ -143,7 +146,9 @@ function insertControlTable(object_name, visible, lr, index, width) {
         // 一元化したテーブルの方を書き換える
         for(let i = 0; i < equipment_status.length; i++) {
           if(equipment_status[i].id == objectName) {
-            equipment_status[i].address.side = lr_value;
+            if (lr_value === 'A' || lr_value === 'B') {
+              equipment_status[i].address.side = lr_value;
+            }
             equipment_status[i].address.position_index = index_value;
           }
         }
@@ -153,7 +158,7 @@ function insertControlTable(object_name, visible, lr, index, width) {
   };
 
   const row = tableBody.insertRow();
-  row.dataset.objectIndex = 0;
+  row.dataset.objectIndex = String(0);
 
   row.insertCell().textContent = object_name;
   // 表示・非表示のチェックボックスのセル
@@ -170,8 +175,6 @@ function insertControlTable(object_name, visible, lr, index, width) {
   const lrCell = row.insertCell();
   const lrSelect = document.createElement('select');
   const lr_options = [
-    //{name: 'left', value: 'left'},
-    //{name: 'right', value: 'right'},
     {name: 'A', value: 'A'},
     {name: 'B', value: 'B'},
   ];
@@ -195,7 +198,7 @@ function insertControlTable(object_name, visible, lr, index, width) {
   const posSelect = document.createElement('select');
   for(let i = 0; i < 18; i++) {
     const opt = document.createElement('option');
-    opt.value = i;
+    opt.value = String(i);
     opt.textContent = `${i}`;
     if (i == index) {
       opt.selected = true;
@@ -204,29 +207,29 @@ function insertControlTable(object_name, visible, lr, index, width) {
   }
   // 機器の幅（区画何枚分を取るか）
   const widthCell = row.insertCell();
-  widthCell.textContent = width;
+  widthCell.textContent = String(width);
   posSelect.addEventListener('change', (e) => { reflect_position(e); });
   posCell.appendChild(posSelect);
 }
 
-function init_gui(equipment_list) {
-    function makeAdapter(key, selMap, onChange) {
-      const ensure = () => selMap.get(key) ?? (selMap.set(key, {side: 'left', index: 0}), selMap.get(key));
-      return {
-        get side() { return ensure().side; },
-        set side(v) {
-          const cur = ensure(); 
-          const next = { ...cur, side: v};
-          selMap.set(key, next); onChange(next);
-        },
-        get index() { return ensure().index;},
-        set index(v) {
-          const cur = ensure();
-          const next = {...cur, index: (v|0)};
-          selMap.set(key, next); onChange(next);
-        },
-      };
-    }
+function init_gui(equipment_list:EquipmentStatusList) {
+    //function makeAdapter(key, selMap, onChange) {
+    //  const ensure = () => selMap.get(key) ?? (selMap.set(key, {side: 'left', index: 0}), selMap.get(key));
+    //  return {
+    //    get side() { return ensure().side; },
+    //    set side(v) {
+    //      const cur = ensure(); 
+    //      const next = { ...cur, side: v};
+    //      selMap.set(key, next); onChange(next);
+    //    },
+    //    get index() { return ensure().index;},
+    //    set index(v) {
+    //      const cur = ensure();
+    //      const next = {...cur, index: (v|0)};
+    //      selMap.set(key, next); onChange(next);
+    //    },
+    //  };
+    //}
     const gui_obj = new GUI();
     gui_obj.add(display_settings, 'show_grid_helper');
     const gui_light_folder = gui_obj.addFolder('Light Settings');
@@ -241,10 +244,10 @@ function init_gui(equipment_list) {
     init_gui_folder.add(init_settings, 'initialize');
 
     const deck_folder = gui_obj.addFolder('Visibility');
-    const params = {};
+    const params: Record<string,boolean> = {};
     for (const  [key, val] of deck_visibility_settings) {
         params[key] = val;
-        deck_folder.add(params, key).onChange((v) => {
+        deck_folder.add(params, key).onChange((v: boolean) => {
             deck_visibility_settings.set(key, v);
         });
     };
@@ -255,10 +258,23 @@ function init_gui(equipment_list) {
 const objects = [];
 const threeArea = document.getElementById('three-area');
 console.log(threeArea);
-const tableBody = document.querySelector('#object-control-table tbody');
+const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
 
+type Ctx = {
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+  registry: Map<string, THREE.Object3D>;
+  model_load_done_flag: boolean;
+  raycaster: THREE.Raycaster | null;
+  pointer: THREE.Vector2 | null;
+  mousemoved_flag: boolean;
+  INTERSECTED: THREE.Object3D | null;
+};
 
-function createCtx() {
+function createCtx() :Ctx
+{
   // scene
   const scene = new THREE.Scene();
   //camera
@@ -313,7 +329,7 @@ function createCtx() {
 }
 
 
-function init_model2(ctx, n_additional_deck = 1) {
+function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
     ctx.model_load_done_flag = false;
     const model_file = '/asset/Ardea_Lightweight.named.glb';
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
@@ -371,7 +387,7 @@ function init_model2(ctx, n_additional_deck = 1) {
     deck_settings.set("arm_position", 0);
 }
 
-function init_equipments(ctx, equipment_info) {
+function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   const loader = new GLTFLoader();
   const left_right = equipment_info.address.side;
   const index = equipment_info.address.position_index;
@@ -392,7 +408,7 @@ function init_equipments(ctx, equipment_info) {
   insertControlTable(equipment_info.id, true, left_right, index, width);
 }
 
-function place_equipments(ctx, object_id, left_right, index, visible = true) {
+function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
   try {
     //console.log(object_id, left_right, index, visible, width);
     const obj = reg.get(ctx, object_id);
@@ -406,13 +422,7 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
     const width = obj.userData.object_attribute.width ?? 1;
     index = Number(index);
     const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
-    if (left_right == 'right' && obj.userData.rotate % 2 == 1) {
-      obj.rotateY(Math.PI);
-      obj.userData.rotate += 1;
-    } else if (left_right == 'left' && obj.userData.rotate % 2 == 0) {
-      obj.rotateY(Math.PI);
-      obj.userData.rotate += 1;
-    } else if (left_right == 'B' && obj.userData.rotate % 2 == 1) {
+    if (left_right == 'B' && obj.userData.rotate % 2 == 1) {
       obj.rotateY(Math.PI); // left
       obj.userData.rotate += 1;
     } else if (left_right == 'A' && obj.userData.rotate % 2 == 0) {
@@ -423,7 +433,7 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
     let offset_z = obj.userData.object_attribute.offset_z ?? 0;
     let offset_x = obj.userData.object_attribute.offset_x ?? 0;
     console.log(`${object_id} placement ${offset_z} ${offset_x}`);
-    if (left_right == 'A' || left_right == 'left') {
+    if (left_right == 'A') {
       offset_z *= -1;
     }
 
@@ -451,11 +461,11 @@ function place_equipments(ctx, object_id, left_right, index, visible = true) {
   }
 }
 
-let gui;
+let gui: GUI;
 const ctx = createCtx();
 setup();
 
-function setup(additional_deck = 1) {
+function setup(additional_deck: number = 1) {
   // まずはArdeaのモデルをセットアップする
   init_model2(ctx, additional_deck);
   init_helper(ctx);
@@ -469,7 +479,7 @@ function setup(additional_deck = 1) {
     init_equipments(ctx, equipment_status[i]);
   }
   // 右上のGUIのセットアップ
-  gui = init_gui();
+  gui = init_gui(equipment_status);
 }
 
 function cleanup() {
