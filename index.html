@@ -4,15 +4,6 @@
   <meta charset="UTF-8">
   <title>Three.js ESM</title>
   <style>body { margin: 0; }</style>
-  <script type="importmap">
-	{
-	  "imports": {
-		"three": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.module.js",
-		"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/",
-		"lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/+esm"
-	  }
-	}
-  </script>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     /* 画面全体を左右に分割するコンテナ */
@@ -93,7 +84,7 @@
       </table>
     </div>
   </div>
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 
 <script>

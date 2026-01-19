@@ -1,0 +1,29 @@
+{
+  "name": "displaydeck",
+  "version": "1.0.0",
+  "description": "This is a simple example to show the Ardea model.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YukiSakamoto/DisplayDeck.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YukiSakamoto/DisplayDeck/issues"
+  },
+  "homepage": "https://github.com/YukiSakamoto/DisplayDeck#readme",
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}
