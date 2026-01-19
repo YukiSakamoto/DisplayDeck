@@ -127,9 +127,12 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
         visible = visible_checkbox.checked;
       }
       const lr_dropdown = currentRow.cells[2].querySelector('select');
-      let lr_value = null;
+      let lr_value: SideAB|null = null;
       if (lr_dropdown) {
-        lr_value = lr_dropdown.value;
+        const v = lr_dropdown.value;
+        if (v === 'A' || v === 'B') {
+          lr_value = v;
+        }
       }
       const index_dropdown = currentRow.cells[3].querySelector('select');
       let index_value: number | null = null;
