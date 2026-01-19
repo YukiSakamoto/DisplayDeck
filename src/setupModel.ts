@@ -1,4 +1,18 @@
 import * as THREE from 'three';
+import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+export type Ctx = {
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+  registry: Map<string, THREE.Object3D>;
+  model_load_done_flag: boolean;
+  raycaster: THREE.Raycaster | null;
+  pointer: THREE.Vector2 | null;
+  mousemoved_flag: boolean;
+  INTERSECTED: THREE.Mesh | null;
+};
 
 export const reg = {
     /**
@@ -7,7 +21,7 @@ export const reg = {
      * @param {string} id   一意なID（"box/main" のような階層名推奨）
      * @param {THREE.Object3D} obj
      */
-    add(ctx, id, obj) {
+    add(ctx:Ctx, id: string, obj: THREE.Object3D) {
         if (ctx.registry.has(id)) {
             throw new Error(`Duplicate id : ${id}`);
         }
@@ -15,7 +29,7 @@ export const reg = {
         ctx.registry.set(id, obj);
         ctx.scene.add(obj);
     },
-    attach(ctx, id, obj) {
+    attach(ctx: Ctx, id: string, obj: THREE.Object3D) {
         if (ctx.registry.has(id)) {
             throw new Error(`Duplicate id : ${id}`);
         }
@@ -29,7 +43,7 @@ export const reg = {
      * @param {string} id
      * @returns {THREE.Object3D}
      */
-    get(ctx, id) {
+    get(ctx: Ctx, id: string) {
         const obj = ctx.registry.get(id);
         if (!obj) {
             throw new Error(`Not found: ${id}`);
@@ -42,7 +56,7 @@ export const reg = {
      * @param {(o:THREE.Object3D)=>boolean} [predicate]
      * @returns {THREE.Object3D[]}
      */
-    all(ctx, predicate) {
+    all(ctx: Ctx, predicate?: (o:THREE.Object3D)=>boolean) {
         const arr = Array.from(ctx.registry.values());
         return predicate ? arr.filter(predicate) : arr;
     },
@@ -52,13 +66,13 @@ export const reg = {
      * @param {*} ctx
      * @param {string} id
      */
-    remove(ctx, id) {
+    remove(ctx:Ctx, id:string) {
         const obj = this.get(ctx, id);
         ctx.scene.remove(obj);
         ctx.registry.delete(id);
     },
 
-    remove_all(ctx) {
+    remove_all(ctx:Ctx) {
       //ctx.registry.keys((key) => {
       //  console.log(key);
       //  this.remove(ctx, key);
@@ -68,8 +82,8 @@ export const reg = {
       }
     },
 
-    extract_and_attach_to_scene(ctx, parent_model, extract_name_list) {
-        const picked = []
+    extract_and_attach_to_scene(ctx:Ctx, parent_model: THREE.Object3D, extract_name_list: string[]) {
+        const picked: THREE.Object3D[] = []
         ctx.scene.add(parent_model);
         extract_name_list.forEach(name => {
             let obj = parent_model.getObjectByName(name);
@@ -82,7 +96,7 @@ export const reg = {
     },
 };
 
-export function init_lighting(ctx, ambient_light_intensity, directional_light_intensity) {
+export function init_lighting(ctx:Ctx, ambient_light_intensity:number, directional_light_intensity:number) {
     const ambient_light = new THREE.AmbientLight(0xFFFFFF, ambient_light_intensity);
     const directional_light = new THREE.DirectionalLight(0xFFFFFF, directional_light_intensity);
     directional_light.position.set(1, 2, 3);
@@ -90,12 +104,12 @@ export function init_lighting(ctx, ambient_light_intensity, directional_light_in
     reg.add(ctx, "light:directional", directional_light);
 }
 
-export function init_raycaster(ctx) {
+export function init_raycaster(ctx:Ctx) {
   const pointer = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   ctx.raycaster = raycaster;
   ctx.pointer = pointer;
-  function onPointerMove(event) {
+  function onPointerMove(event:PointerEvent) {
     const rect = ctx.renderer.domElement.getBoundingClientRect();
     
     ctx.pointer.x =  ( (event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -105,12 +119,12 @@ export function init_raycaster(ctx) {
   window.addEventListener('pointermove', onPointerMove);
 }
 
-export function init_helper(ctx) {
+export function init_helper(ctx:Ctx) {
   const axisHelper = new THREE.AxesHelper(5);
   reg.add(ctx, "helper:axis", axisHelper);
 }
 
-export function init_collider(ctx, n_additional_deck = 1) {
+export function init_collider(ctx:Ctx, n_additional_deck = 1) {
   const top_panel = [
     { x: 0, y: 8.5, z:  8.5, width: 36, height: 0.1, depth: 8.0, division: 3},  // left
     { x: 0, y: 8.5, z: -8.5, width: 36, height: 0.1, depth: 8.0, division: 3},  // right
@@ -141,26 +155,55 @@ export function init_collider(ctx, n_additional_deck = 1) {
   reg.add(ctx, "Collider", collider_group);
 }
 
-export function point_collider(ctx, scene_id) {
+type HighlightMesh = THREE.Mesh & {
+  userData: THREE.Mesh['userData'] & { store_color?: THREE.Color };
+};
+
+function getColorMaterial(
+  mesh: THREE.Mesh
+): (THREE.Material & { color: THREE.Color; opacity: number }) | null {
+  const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  if (mat && 'color' in mat && typeof (mat as any).opacity === 'number') {
+    return mat as THREE.Material & { color: THREE.Color; opacity: number };
+  }
+  return null;
+}
+
+export function point_collider(ctx: Ctx, scene_id: string) {
+  if (!ctx.raycaster || !ctx.pointer) return;
   ctx.raycaster.setFromCamera(ctx.pointer, ctx.camera);
   const intersects = ctx.raycaster.intersectObjects(reg.get(ctx, scene_id).children);
-  if (intersects.length > 0) {
-    if (ctx.INTERSECTED != intersects[0].object) {
-      if (ctx.INTERSECTED) {
-        ctx.INTERSECTED.material.color.set(ctx.INTERSECTED.store_color);
-        ctx.INTERSECTED.material.opacity = 0;
+  const hit = intersects[0]?.object;
+
+  if (hit instanceof THREE.Mesh) {
+    const mesh = hit as HighlightMesh;
+    const mat = getColorMaterial(mesh);
+    if (!mat) return;
+
+    if (ctx.INTERSECTED && ctx.INTERSECTED !== mesh) {
+      const prev = ctx.INTERSECTED as HighlightMesh;
+      const prevMat = getColorMaterial(prev);
+      if (prevMat && prev.userData.store_color) {
+        prevMat.color.set(prev.userData.store_color);
       }
-      ctx.INTERSECTED = intersects[0].object;
-      ctx.INTERSECTED.store_color = ctx.INTERSECTED.material.color.clone();
-      ctx.INTERSECTED.material.color.set(0xff0000);
-      ctx.INTERSECTED.material.opacity = 0.3;
+      if (prevMat) prevMat.opacity = 0;
     }
-  } else {
-    if (ctx.INTERSECTED) {
-      ctx.INTERSECTED.material.color.set(ctx.INTERSECTED.store_color);
-      ctx.INTERSECTED.material.opacity = 0;
+
+    if (ctx.INTERSECTED !== mesh) {
+      ctx.INTERSECTED = mesh;
+      mesh.userData.store_color = mat.color.clone();
+      mat.color.set(0xff0000);
+      mat.opacity = 0.3;
+    }
+  } else if (ctx.INTERSECTED) {
+    const prev = ctx.INTERSECTED as HighlightMesh;
+    const prevMat = getColorMaterial(prev);
+    if (prevMat && prev.userData.store_color) {
+      prevMat.color.set(prev.userData.store_color);
+      prevMat.opacity = 0;
     }
     ctx.INTERSECTED = null;
   }
+
   ctx.mousemoved_flag = false;
 }

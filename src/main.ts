@@ -8,7 +8,8 @@ import { placeNextTo,angleDiff, replaceWithLambertKeepColor } from './utils'
 import {
   reg, init_lighting, init_raycaster, init_helper,
   init_collider, point_collider,
- } from './setupModel'
+} from './setupModel'
+import type { Ctx } from './setupModel';
 
 type DisplaySettings = {
   show_grid_helper: boolean;
@@ -263,20 +264,7 @@ const threeArea = document.getElementById('three-area');
 console.log(threeArea);
 const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
 
-type Ctx = {
-  scene: THREE.Scene;
-  camera: THREE.Camera;
-  renderer: THREE.WebGLRenderer;
-  controls: OrbitControls;
-  registry: Map<string, THREE.Object3D>;
-  model_load_done_flag: boolean;
-  raycaster: THREE.Raycaster | null;
-  pointer: THREE.Vector2 | null;
-  mousemoved_flag: boolean;
-  INTERSECTED: THREE.Object3D | null;
-};
-
-function createCtx() :Ctx
+function createCtx(): Ctx
 {
   // scene
   const scene = new THREE.Scene();
