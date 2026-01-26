@@ -11,6 +11,8 @@ import {
 } from './setupModel'
 import type { Ctx } from './setupModel';
 
+const ASSET_BASE = `${import.meta.env.BASE_URL}asset/`;
+
 type DisplaySettings = {
   show_grid_helper: boolean;
   ambient_light_intensity: number;
@@ -76,23 +78,23 @@ type EquipmentStatusList = EquipmentStatus[];
 const equipment_status: EquipmentStatusList = [
   { 
     id: "peeler", 
-    object_attribute: {file: "/asset/Xpeel_v2.glb", width: 2, offset_x: 0, offset_z: 2},
+    object_attribute: {file: `${ASSET_BASE}/Xpeel_v2.glb`, width: 2, offset_x: 0, offset_z: 2},
     address: {  side: "A", position_index: 5,  },
     sila2_uri: {ip: "100.84.15.10", port: 8080}
   },
   { 
     id: "centrifuge", 
-    object_attribute: {file: "/asset/Microplate_Centrifuge_v2.glb", width: 2, offset_z: 3},
+    object_attribute: {file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 3},
     address: { side: "B", position_index: 6},
   },
   {
     id: "thermal_cycler", 
-    object_attribute: {file: "/asset/automated_thermal_cycler.glb", width: 1, offset_z: 2 },
+    object_attribute: {file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 2 },
     address: { side: "A", position_index: 8},
   },
   {
     id: "sealer", 
-    object_attribute: {file: "/asset/275-HS4T00-00.glb", width: 1, offset_z: 2},
+    object_attribute: {file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 2},
     address: {side: "B", position_index: 12},
   }
 ];
@@ -296,7 +298,7 @@ function createCtx(): Ctx
   
   // handler
   //ambient_light
-  const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
+      const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
   scene.add(ambient_light);
   // directional light
   const directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
@@ -325,7 +327,7 @@ function createCtx(): Ctx
 
 function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
     ctx.model_load_done_flag = false;
-    const model_file = '/asset/Ardea_Lightweight.named.glb';
+    const model_file = `${ASSET_BASE}/Ardea_Lightweight.named.glb`;
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
     const loader = new GLTFLoader();
     loader.load(model_file, (gltf) => {
