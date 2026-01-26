@@ -161,6 +161,7 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
     }
   };
 
+  if (!tableBody) return;
   const row = tableBody.insertRow();
   row.dataset.objectIndex = String(0);
 
@@ -261,17 +262,19 @@ function init_gui(equipment_list:EquipmentStatusList) {
 
 const objects = [];
 const threeArea = document.getElementById('three-area');
-console.log(threeArea);
+if (!threeArea) {
+  throw new Error("Missing #three-area");
+}
 const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
 
 function createCtx(): Ctx
 {
   // scene
   const scene = new THREE.Scene();
-  //camera
-  //const camera = new THREE.PerspectiveCamera(
-  //  75, window.innerWidth / window.innerHeight, 0.1, 1000
-  //);
+  if (!threeArea) {
+    throw new Error("Missing #three-area");
+  }
+  
   const camera = new THREE.PerspectiveCamera(
     75, threeArea.clientWidth / threeArea.clientHeight, 0.1, 1000
   );
@@ -430,11 +433,14 @@ function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index
 
     const collider_group = reg.get(ctx, "Collider");
     const collider = collider_group.getObjectByName(`${left_right}-${index}`);
+    if (!collider) return;
     let x_pos = collider.position.x;
+
     if (width % 2 == 0) {
       // 位置は、原則、オブジェクトの真ん中が乗っかる板の番号。
       // もし偶数のときは、その次のパネルとの中央位置を扱う方が良い。
       const collider2 = collider_group.getObjectByName(`${left_right}-${index + 1}`);
+      if (!collider2) return;
       let x_pos2 = collider2.position.x;
       x_pos = (x_pos + x_pos2) / 2;
     }
@@ -477,6 +483,7 @@ function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
   reg.remove_all(ctx);
+  if (!tableBody){ return; }
   tableBody.innerHTML = '';
   need_initialize = false;
 }
@@ -487,8 +494,10 @@ function animate() {
 
   // light settings
   let ambient_light = reg.get(ctx, "light:ambient");
+  if ( (ambient_light instanceof THREE.AmbientLight) != true ) { return; }
   ambient_light.intensity = display_settings.ambient_light_intensity;
   let directional_light = reg.get(ctx, "light:directional");
+  if ((directional_light instanceof THREE.DirectionalLight) != true) { return; }
   directional_light.intensity = display_settings.directional_light_intensity;
   directional_light.position.x = display_settings.directional_light_position_x;
   directional_light.position.y = display_settings.directional_light_position_y;

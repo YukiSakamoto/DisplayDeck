@@ -87,6 +87,7 @@ export const reg = {
         ctx.scene.add(parent_model);
         extract_name_list.forEach(name => {
             let obj = parent_model.getObjectByName(name);
+            if (!obj) {return;}
             this.attach(ctx, name, obj);
             picked.push(obj);
         });
@@ -111,7 +112,9 @@ export function init_raycaster(ctx:Ctx) {
   ctx.pointer = pointer;
   function onPointerMove(event:PointerEvent) {
     const rect = ctx.renderer.domElement.getBoundingClientRect();
-    
+    if (!ctx.pointer){
+      throw new Error("ctx pointer is not asigned");
+    }
     ctx.pointer.x =  ( (event.clientX - rect.left) / rect.width) * 2 - 1;
     ctx.pointer.y = -( (event.clientY - rect.top) / rect.height) * 2 + 1;
     ctx.mousemoved_flag = true;
