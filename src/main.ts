@@ -268,6 +268,42 @@ if (!threeArea) {
   throw new Error("Missing #three-area");
 }
 const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
+const serverHealthEl = document.getElementById('server-health');
+
+const HEALTH_ENDPOINT = 'http://localhost:8000/health';
+const HEALTH_POLL_MS = 60_000;
+let healthPollId: number | null = null;
+
+function updateServerHealth(text: string, ok: boolean) {
+  if (!serverHealthEl) return;
+  serverHealthEl.textContent = `Server: ${text}`;
+  serverHealthEl.style.color = ok ? '#0a7d2a' : '#b00020';
+}
+
+async function fetchServerHealth() {
+  try {
+    const res = await fetch(HEALTH_ENDPOINT, { cache: 'no-store' });
+    if (res.ok) {
+      updateServerHealth('OK', true);
+    } else {
+      updateServerHealth(`NG (${res.status})`, false);
+    }
+  } catch {
+    updateServerHealth('NG (network)', false);
+  }
+}
+
+function startServerHealthPolling() {
+  if (!serverHealthEl || healthPollId !== null) return;
+  fetchServerHealth().catch(() => {
+    updateServerHealth('NG (network)', false);
+  });
+  healthPollId = window.setInterval(() => {
+    fetchServerHealth().catch(() => {
+      updateServerHealth('NG (network)', false);
+    });
+  }, HEALTH_POLL_MS);
+}
 
 function createCtx(): Ctx
 {
@@ -463,6 +499,7 @@ function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index
 let gui: GUI;
 const ctx = createCtx();
 setup();
+startServerHealthPolling();
 
 function setup(additional_deck: number = 1) {
   // まずはArdeaのモデルをセットアップする
