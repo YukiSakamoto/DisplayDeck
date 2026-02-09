@@ -273,6 +273,9 @@ const serverHealthEl = document.getElementById('server-health');
 const HEALTH_ENDPOINT = 'http://localhost:8000/health';
 const HEALTH_POLL_MS = 60_000;
 let healthPollId: number | null = null;
+const DISCOVER_ENDPOINT = 'http://localhost:8000/sila/discover';
+const DISCOVER_POLL_MS = 60_000;
+let discoverPollID: number | null = null;
 
 function updateServerHealth(text: string, ok: boolean) {
   if (!serverHealthEl) return;
@@ -283,8 +286,18 @@ function updateServerHealth(text: string, ok: boolean) {
 async function fetchServerHealth() {
   try {
     const res = await fetch(HEALTH_ENDPOINT, { cache: 'no-store' });
-    if (res.ok) {
+    if (res.ok) { // 生存確認OK
       updateServerHealth('OK', true);
+      fetch(DISCOVER_ENDPOINT, {cache: 'no-store'})
+        .then((res2) => {
+          if (!res2.ok) {
+            throw new Error(`Discover HTTP ${res2.status}`);
+          } 
+          return res2.json();
+        })
+        .then(data => {
+          console.log(data);
+        })
     } else {
       updateServerHealth(`NG (${res.status})`, false);
     }
