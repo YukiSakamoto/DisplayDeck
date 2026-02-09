@@ -268,7 +268,9 @@ if (!threeArea) {
   throw new Error("Missing #three-area");
 }
 const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
+const tableBody2 = document.querySelector<HTMLTableSectionElement>('#object-control-table2 tbody');
 const serverHealthEl = document.getElementById('server-health');
+const serverLatest = document.getElementById('update-time');
 
 const HEALTH_ENDPOINT = 'http://localhost:8000/health';
 const HEALTH_POLL_MS = 60_000;
@@ -281,6 +283,24 @@ function updateServerHealth(text: string, ok: boolean) {
   if (!serverHealthEl) return;
   serverHealthEl.textContent = `Server: ${text}`;
   serverHealthEl.style.color = ok ? '#0a7d2a' : '#b00020';
+}
+
+function reflect_table2(server_name: string, type: string, address: string, port: number, status: number) {
+  if (!tableBody2) return;
+  const row = tableBody2.insertRow();
+  row.dataset.objectIndex = String(0);
+  // name
+  row.insertCell().textContent = server_name;
+  // visible
+  row.insertCell();
+  // type
+  row.insertCell().textContent = type;
+  // address
+  row.insertCell().textContent = address;
+  // port
+  row.insertCell().textContent = String(port);
+  //status
+  row.insertCell().textContent = String(status);
 }
 
 async function fetchServerHealth() {
@@ -296,7 +316,26 @@ async function fetchServerHealth() {
           return res2.json();
         })
         .then(data => {
-          console.log(data);
+          //console.log(data);
+          if (serverLatest) {
+            serverLatest.textContent = `Latest: ${new Date().toLocaleString()}`;
+          }
+          if (tableBody2) {
+            tableBody2.replaceChildren();
+          }
+          for(let i = 0; i < data["servers"].length; i++) {
+            let server_data = data["servers"][i]
+            let address = server_data["address"]["ip"];
+            let port = server_data["address"]["port"];
+            console.log(data["servers"][i]);
+            reflect_table2(
+              data["servers"][i]["name"],
+              data["servers"][i]["type"],
+              address,
+              port,
+              data["servers"][i]["status"]
+            );
+          }
         })
     } else {
       updateServerHealth(`NG (${res.status})`, false);
