@@ -54,7 +54,7 @@ function side_AB2lr(side: string): SideLR | null
   return null;
 }
 
-type EquipmentAddress = {
+type EquipmentPosition = {
   side: SideAB;
   position_index: number;
 };
@@ -71,7 +71,7 @@ type EquipmentSila2Uri = {
 type EquipmentStatus = {
   id: string;
   object_attribute: EquipmentObjectAttribute;
-  address: EquipmentAddress;
+  position: EquipmentPosition;
   sila2_uri?: EquipmentSila2Uri;
 }
 type EquipmentStatusList = EquipmentStatus[];
@@ -79,23 +79,23 @@ const equipment_status: EquipmentStatusList = [
   { 
     id: "peeler", 
     object_attribute: {file: `${ASSET_BASE}/Xpeel_v2.glb`, width: 2, offset_x: 0, offset_z: 2},
-    address: {  side: "A", position_index: 5,  },
+    position: {  side: "A", position_index: 5,  },
     sila2_uri: {ip: "100.84.15.10", port: 8080}
   },
   { 
     id: "centrifuge", 
     object_attribute: {file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 3},
-    address: { side: "B", position_index: 6},
+    position: { side: "B", position_index: 6},
   },
   {
     id: "thermal_cycler", 
     object_attribute: {file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 2 },
-    address: { side: "A", position_index: 8},
+    position: { side: "A", position_index: 8},
   },
   {
     id: "sealer", 
     object_attribute: {file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 2},
-    address: {side: "B", position_index: 12},
+    position: {side: "B", position_index: 12},
   }
 ];
 
@@ -153,9 +153,9 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
         for(let i = 0; i < equipment_status.length; i++) {
           if(equipment_status[i].id == objectName) {
             if (lr_value === 'A' || lr_value === 'B') {
-              equipment_status[i].address.side = lr_value;
+              equipment_status[i].position.side = lr_value;
             }
-            equipment_status[i].address.position_index = index_value;
+            equipment_status[i].position.position_index = index_value;
           }
         }
         console.log(equipment_status);
@@ -473,8 +473,8 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
 
 function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   const loader = new GLTFLoader();
-  const left_right = equipment_info.address.side;
-  const index = equipment_info.address.position_index;
+  const left_right = equipment_info.position.side;
+  const index = equipment_info.position.position_index;
   const width = equipment_info.object_attribute.width;
 
   console.log(equipment_info);
