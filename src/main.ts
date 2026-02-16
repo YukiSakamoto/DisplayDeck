@@ -86,11 +86,13 @@ const equipment_status: EquipmentStatusList = [
     id: "centrifuge", 
     object_attribute: {file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 3},
     position: { side: "B", position_index: 6},
+    sila2_uri: {ip: "172.18.0.4", port: 50052 }
   },
   {
     id: "thermal_cycler", 
     object_attribute: {file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 2 },
     position: { side: "A", position_index: 8},
+    sila2_uri: {ip:"172.18.0.5", port:50052 },
   },
   {
     id: "sealer", 
@@ -112,7 +114,24 @@ const deck_visibility_settings: Map<string,boolean> = new Map();
 const deck_settings = new Map();
 const equipment_position_settings = new Map();
 
-function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number) {
+function refreshStatusTable(ip: string, port: number, health: number) {
+  const ipaddress_string: string = `${ip}:${port}`;
+  if (tableBody) {
+    for(const row of Array.from(tableBody.rows)) {
+      const addressCell = row.querySelector<HTMLTableCellElement>('td[data-col="address"]')
+      if (addressCell?.textContent == ipaddress_string) {
+        const statusCell = row.querySelector<HTMLTableCellElement>('td[data-col="status"]');
+        if (statusCell) {
+          statusCell.textContent = `${health}`;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number, uri?: EquipmentSila2Uri) {
   // テーブルが操作された時に、モデルの位置を反映する
   const reflect_position = function(elem: Event) {
     // この行の中のすべての要素を取得する。
@@ -167,9 +186,14 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   const row = tableBody.insertRow();
   row.dataset.objectIndex = String(0);
 
-  row.insertCell().textContent = object_name;
+  // オブジェクト名
+  const nameCell = row.insertCell();
+  nameCell.textContent = object_name;
+  nameCell.dataset.col = "name";
+
   // 表示・非表示のチェックボックスのセル
   const visibilityCell = row.insertCell();
+  visibilityCell.dataset.col = "visibility";
   const visibilityInput = document.createElement('input');
   visibilityInput.type = 'checkbox';
   visibilityInput.checked = visible;
@@ -180,6 +204,7 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
 
   // Left/Rightのドロップボックスのセル
   const lrCell = row.insertCell();
+  lrCell.dataset.col = "lr";
   const lrSelect = document.createElement('select');
   const lr_options = [
     {name: 'A', value: 'A'},
@@ -202,6 +227,7 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
 
   // 板の中での位置の数字を選択するところ
   const posCell = row.insertCell();
+  posCell.dataset.col = "position";
   const posSelect = document.createElement('select');
   for(let i = 0; i < 18; i++) {
     const opt = document.createElement('option');
@@ -214,9 +240,21 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   }
   // 機器の幅（区画何枚分を取るか）
   const widthCell = row.insertCell();
+  widthCell.dataset.col = "width";
   widthCell.textContent = String(width);
   posSelect.addEventListener('change', (e) => { reflect_position(e); });
   posCell.appendChild(posSelect);
+
+  const addressCell = row.insertCell();
+  addressCell.dataset.col = "address";
+  if (uri != undefined) {
+    addressCell.textContent = `${uri.ip}:${uri.port}`;
+  }
+  // status
+  const statusCell = row.insertCell();
+  statusCell.dataset.col = "status";
+  statusCell.dataset.role = "pending-status"; //保留中の印をつけておく
+  statusCell.textContent = "";
 }
 
 function init_gui(equipment_list:EquipmentStatusList) {
@@ -327,15 +365,16 @@ async function fetchServerHealth() {
             let server_data = data["servers"][i]
             let address = server_data["address"]["ip"];
             let port = server_data["address"]["port"];
-            console.log(data["servers"][i]);
-            reflect_table2(
-              data["servers"][i]["name"],
-              data["servers"][i]["type"],
-              address,
-              port,
-              data["servers"][i]["status"]
-            );
+            let status = server_data["status"];
+            const exist = refreshStatusTable(address, port, status);
+            if (!exist) {
+              reflect_table2(
+                data["servers"][i]["name"], data["servers"][i]["type"],
+                address, port, data["servers"][i]["status"]
+              );
+            }
           }
+          console.log('----------');
         })
     } else {
       updateServerHealth(`NG (${res.status})`, false);
@@ -476,6 +515,7 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   const left_right = equipment_info.position.side;
   const index = equipment_info.position.position_index;
   const width = equipment_info.object_attribute.width;
+  const uri = equipment_info.sila2_uri;
 
   console.log(equipment_info);
   loader.load(equipment_info.object_attribute.file, (gltf) => {
@@ -489,7 +529,7 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
     place_equipments(ctx, equipment_info.id, left_right, index);
   });
   // 画面下部の登録に表示する。
-  insertControlTable(equipment_info.id, true, left_right, index, width);
+  insertControlTable(equipment_info.id, true, left_right, index, width, uri);
 }
 
 function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
