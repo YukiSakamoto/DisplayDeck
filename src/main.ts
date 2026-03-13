@@ -261,8 +261,9 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   resetButton.type = 'button';
   resetButton.textContent = 'Reset';
   resetButton.addEventListener('click', () => {
-    //
-    if (uri != undefined) alert(`Reset! ${uri.ip}:${uri.port}`);
+    if (uri != undefined) {
+      EquipmentReset(uri.ip, uri.port);
+    } 
   });
   resetbuttonCell.appendChild(resetButton);
 }
@@ -322,6 +323,7 @@ const serverLatest = document.getElementById('update-time');
 
 const HEALTH_ENDPOINT = 'http://localhost:8000/health';
 const HEALTH_POLL_MS = 60_000;
+const RESET_ENDPOINT = 'http://localhost:8000/reset';
 let healthPollId: number | null = null;
 const DISCOVER_ENDPOINT = 'http://localhost:8000/sila/discover';
 const DISCOVER_POLL_MS = 60_000;
@@ -355,7 +357,9 @@ function reflect_table2(server_name: string, type: string, address: string, port
   resetButton.type = 'button';
   resetButton.textContent = 'Reset';
   resetButton.addEventListener('click', () => {
-    if (address != undefined) alert(`Reset ${address}:${String(port)}`);
+    if (address != undefined) {
+      EquipmentReset(address, port);
+    };
   })
   resetbuttonCell.appendChild(resetButton);
 }
@@ -413,6 +417,21 @@ function startServerHealthPolling() {
       updateServerHealth('NG (network)', false);
     });
   }, HEALTH_POLL_MS);
+}
+
+async function EquipmentReset(ip: string, port: number) {
+  try {
+    const reset_uri = `${RESET_ENDPOINT}?ip=${ip}&port=${String(port)}&insecure=true`
+    const res = await fetch(reset_uri, {cache: 'no-store'});
+    if (res.ok) {
+      alert(`Sent Reset Signal to ${ip}:${String(port)}`);
+    } else {
+    console.log(res);
+      alert(`Sent Reset Signal to ${ip}:${String(port)}, but maybe Failed. ${await res.text()}`);
+    }
+  } catch {
+      alert(`Sent Reset Signal to ${ip}:${String(port)}, but Failed`);
+  }
 }
 
 function createCtx(): Ctx
