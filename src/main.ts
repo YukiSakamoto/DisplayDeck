@@ -255,6 +255,16 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   statusCell.dataset.col = "status";
   statusCell.dataset.role = "pending-status"; //保留中の印をつけておく
   statusCell.textContent = "";
+  // reset button
+  const resetbuttonCell = row.insertCell();
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.textContent = 'Reset';
+  resetButton.addEventListener('click', () => {
+    //
+    if (uri != undefined) alert(`Reset! ${uri.ip}:${uri.port}`);
+  });
+  resetbuttonCell.appendChild(resetButton);
 }
 
 function init_gui(equipment_list:EquipmentStatusList) {
@@ -339,6 +349,15 @@ function reflect_table2(server_name: string, type: string, address: string, port
   row.insertCell().textContent = String(port);
   //status
   row.insertCell().textContent = String(status);
+  // reset button
+  const resetbuttonCell = row.insertCell();
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.textContent = 'Reset';
+  resetButton.addEventListener('click', () => {
+    if (address != undefined) alert(`Reset ${address}:${String(port)}`);
+  })
+  resetbuttonCell.appendChild(resetButton);
 }
 
 async function fetchServerHealth() {
