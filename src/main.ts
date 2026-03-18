@@ -101,6 +101,20 @@ const equipment_status: EquipmentStatusList = [
   }
 ];
 
+type ArmPosition = {
+  position_index: number;
+};
+type ArmStatus = {
+  id: string;
+  position: ArmPosition;
+  sila2_uri?: EquipmentSila2Uri;
+};
+
+const arm_status: ArmStatus = {
+  id: "arm-server",
+  position: {position_index: 0 },
+  sila2_uri: {ip:"172.18.0.8", port: 50052},
+};
 
 let need_initialize = false;
 const init_settings = {
@@ -139,12 +153,9 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
     if (!(select instanceof HTMLSelectElement)) return;
     const currentRow = select.closest('tr');
     if (currentRow) {
-      console.log(currentRow);
       const objectName = currentRow.cells[0].textContent;
-      //console.log(objectName);
       let visible = null;
       const visible_checkbox = currentRow.cells[1].querySelector<HTMLInputElement>('input[type="checkbox"]');
-      console.log(visible_checkbox);
       if (visible_checkbox) {
         visible = visible_checkbox.checked;
       }
@@ -164,7 +175,6 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
           index_value = parsed;
         }
       }
-      console.log(`CurrentRow: ${objectName} ${visible} ${lr_value} ${index_value}`);
       if (visible != null && lr_value != null && index_value != null) {
         place_equipments(ctx, objectName, lr_value, index_value, visible);
 
@@ -177,7 +187,6 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
             equipment_status[i].position.position_index = index_value;
           }
         }
-        console.log(equipment_status);
       }
     }
   };
@@ -397,7 +406,6 @@ async function fetchServerHealth() {
               );
             }
           }
-          console.log('----------');
         })
     } else {
       updateServerHealth(`NG (${res.status})`, false);
@@ -570,13 +578,114 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   insertControlTable(equipment_info.id, true, left_right, index, width, uri);
 }
 
+function place_arm(ctx: Ctx, visible: boolean, index: Number) {
+  const arm_obj = reg.get(ctx, "Arm");
+  if (visible == false) {
+    arm_obj.visible = false;
+    return;
+  }
+  index = Number(index);
+  const collider_group = reg.get(ctx, "Collider");
+  const collider = collider_group.getObjectByName(`A-${index}`);
+  if (!collider) return;
+  let x_pos = collider.position.x - 2;
+  arm_obj.position.x = x_pos;
+}
+
+function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
+  const reflect_arm_position = function(elem: Event) {
+    const select = elem.currentTarget as HTMLSelectElement;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const currentRow = select.closest('tr');
+    if (currentRow) {
+      const objectName = currentRow.cells[0].textContent;
+      let visible = true;
+      const visible_checkbox = currentRow.cells[1].querySelector<HTMLInputElement>('input[type="checkbox"]');
+      if (visible_checkbox) {
+        visible = visible_checkbox.checked;
+      }
+
+      const index_dropdown = currentRow.cells[3].querySelector('select');
+      let index_value: number | null = null;
+      if (index_dropdown) {
+        const parsed = Number(index_dropdown.value);
+        if (!Number.isNaN(parsed)) {
+          index_value = parsed;
+          place_arm(ctx, visible, index_value);
+        }
+      }
+    }
+
+  };
+  if (!tableBody) return;
+  const row = tableBody.insertRow();
+  row.dataset.objectIndex = String(0);
+  // オブジェクト名
+  const nameCell = row.insertCell();
+  nameCell.textContent = "Arm";
+  nameCell.dataset.col = "name";
+
+  const visibilityCell = row.insertCell();
+  visibilityCell.dataset.col = "visibility";
+  const visibilityInput = document.createElement('input');
+  visibilityInput.type = 'checkbox';
+  visibilityInput.checked = true;
+  visibilityInput.addEventListener('change', (e) => {
+    reflect_arm_position(e);
+  });
+  visibilityCell.appendChild(visibilityInput);
+
+  // left or rightのカラム
+  const lrCell = row.insertCell();
+
+  // position
+  const posCell = row.insertCell();
+  posCell.dataset.col = "position";
+  const posSelect = document.createElement('select');
+  for(let i = 0; i < 18; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `${i}`;
+    if (i == 0) {
+      opt.selected = true;
+    }
+    posSelect.appendChild(opt);
+  }
+  posSelect.addEventListener('change', (e) => {reflect_arm_position(e);});
+  posCell.appendChild(posSelect);
+  // 機器の幅の行（空欄）
+  const widthCell = row.insertCell();
+
+  // ipアドレス
+  const addressCell = row.insertCell();
+  addressCell.dataset.col = "address";
+  if (arm_status.sila2_uri != undefined) {
+    addressCell.textContent = `${arm_status.sila2_uri.ip}:${arm_status.sila2_uri.port}`;
+  }
+  // status
+  const statusCell = row.insertCell();
+  statusCell.dataset.col = "status";
+  statusCell.dataset.role = "pending-status";
+  statusCell.textContent = "";
+  //reset button
+  const resetbuttonCell = row.insertCell();
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.textContent = 'Reset';
+  resetButton.addEventListener('click', () => {
+    if (arm_status.sila2_uri != undefined) {
+      EquipmentReset(arm_status.sila2_uri.ip, arm_status.sila2_uri.port);
+    }
+  })
+  resetbuttonCell.appendChild(resetButton);
+}
+
 function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
   try {
     //console.log(object_id, left_right, index, visible, width);
     const obj = reg.get(ctx, object_id);
     if (visible == false) {
       obj.visible = false;
-      console.log(visible);
       return;
     } else {
       obj.visible = true;
@@ -644,6 +753,7 @@ function setup(additional_deck: number = 1) {
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(ctx, equipment_status[i]);
   }
+  init_arm(ctx, arm_status);
   // 右上のGUIのセットアップ
   gui = init_gui(equipment_status);
 }
@@ -679,12 +789,12 @@ function animate() {
     setup(init_settings.additional_deck);
   }
   // Arm position
-  if (ctx.model_load_done_flag === true) {
-      reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
-      deck_visibility_settings.forEach((val, key) => {
-          reg.get(ctx, key).visible = val;
-      });
-  }
+  //if (ctx.model_load_done_flag === true) {
+  //    reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
+  //    deck_visibility_settings.forEach((val, key) => {
+  //        reg.get(ctx, key).visible = val;
+  //    });
+  //}
   if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
     console.log("mouse moved");
     point_collider(ctx, "Collider");
