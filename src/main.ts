@@ -145,6 +145,22 @@ function refreshStatusTable(ip: string, port: number, health: number) {
   return false;
 }
 
+function refreshTableArmPosition(ip: string, port: number, position: number) {
+  const ipaddress_string: string = `${ip}:${port}`;
+  if (tableBody) {
+    for (const row of Array.from(tableBody.rows)) {
+      const addressCell = row.querySelector<HTMLTableCellElement>('td[data-col="address"]')
+      if (addressCell?.textContent == ipaddress_string) {
+        const positionCell = row.querySelector<HTMLTableCellElement>('td[data-col="position"]');
+        const positionSelect = positionCell?.querySelector<HTMLSelectElement>('select');
+        if (positionSelect) {
+          positionSelect.value = String(position);
+        }
+      }
+    }
+  }
+}
+
 function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number, uri?: EquipmentSila2Uri) {
   // テーブルが操作された時に、モデルの位置を反映する
   const reflect_position = function(elem: Event) {
@@ -337,6 +353,7 @@ let healthPollId: number | null = null;
 const DISCOVER_ENDPOINT = 'http://localhost:8000/sila/discover';
 const DISCOVER_POLL_MS = 60_000;
 let discoverPollID: number | null = null;
+const GET_TROLLEY_POSITION_ENDPOINT = 'http://localhost:8000/sila/trolley-position';
 
 function updateServerHealth(text: string, ok: boolean) {
   if (!serverHealthEl) return;
@@ -406,7 +423,26 @@ async function fetchServerHealth() {
               );
             }
           }
-        })
+        });
+      if (arm_status.sila2_uri) {
+        const endpoint_uri = `${GET_TROLLEY_POSITION_ENDPOINT}?ip=${arm_status.sila2_uri['ip']}&port=${String(arm_status.sila2_uri['port'])}&insecure=true`
+        console.log(`arm: ${endpoint_uri}`);
+        fetch(endpoint_uri, {cache: 'no-store'})
+          .then((res_trolley) => {
+            if (!res_trolley.ok) {
+              console.log('hogehogehoge');
+              throw new Error(`Trolley Posiotion ${res_trolley.status}`);
+            }
+            return res_trolley.json();
+          })
+          .then(data => {
+            let arm_position = data["server"]["position"];
+            place_arm(ctx, true, arm_position);
+            if (arm_status.sila2_uri) {
+              refreshTableArmPosition(arm_status.sila2_uri['ip'], arm_status.sila2_uri['port'], arm_position );
+            }
+          });
+      }
     } else {
       updateServerHealth(`NG (${res.status})`, false);
     }
@@ -579,17 +615,21 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
 }
 
 function place_arm(ctx: Ctx, visible: boolean, index: Number) {
-  const arm_obj = reg.get(ctx, "Arm");
-  if (visible == false) {
-    arm_obj.visible = false;
-    return;
+  try{
+    const arm_obj = reg.get(ctx, "Arm");
+    if (visible == false) {
+      arm_obj.visible = false;
+      return;
+    }
+    index = Number(index);
+    const collider_group = reg.get(ctx, "Collider");
+    const collider = collider_group.getObjectByName(`A-${index}`);
+    if (!collider) return;
+    let x_pos = collider.position.x - 5;  // modified position by adequate offset.
+    arm_obj.position.x = x_pos;
+  } catch {
+    console.log("Arm not found");
   }
-  index = Number(index);
-  const collider_group = reg.get(ctx, "Collider");
-  const collider = collider_group.getObjectByName(`A-${index}`);
-  if (!collider) return;
-  let x_pos = collider.position.x - 2;
-  arm_obj.position.x = x_pos;
 }
 
 function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
