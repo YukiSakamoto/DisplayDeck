@@ -11,6 +11,18 @@ import type { Ctx } from './setupModel';
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}asset/`;
 
+const MODEL_SCALE = 10;
+const ARM_X_OFFSET = -5;
+const GRID_SIZE = 100;
+const GRID_DIVISIONS = 10;
+
+const CAMERA_FOV = 75;
+const CAMERA_NEAR = 0.1;
+const CAMERA_FAR = 1000;
+const CAMERA_INITIAL_POSITION = { x: -10, y: -20, z: 20 };
+
+let position_index_max: number = 0;
+
 type DisplaySettings = {
   show_grid_helper: boolean;
   ambient_light_intensity: number;
@@ -229,7 +241,7 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   const posCell = row.insertCell();
   posCell.dataset.col = "position";
   const posSelect = document.createElement('select');
-  for(let i = 0; i < 18; i++) {
+  for(let i = 0; i < position_index_max; i++) {
     const opt = document.createElement('option');
     opt.value = String(i);
     opt.textContent = `${i}`;
@@ -435,7 +447,6 @@ async function EquipmentReset(ip: string, port: number) {
     if (res.ok) {
       alert(`Sent Reset Signal to ${ip}:${String(port)}`);
     } else {
-    console.log(res);
       alert(`Sent Reset Signal to ${ip}:${String(port)}, but maybe Failed. ${await res.text()}`);
     }
   } catch {
@@ -452,10 +463,9 @@ function createCtx(): Ctx
   }
   
   const camera = new THREE.PerspectiveCamera(
-    75, threeArea.clientWidth / threeArea.clientHeight, 0.1, 1000
+    CAMERA_FOV, threeArea.clientWidth / threeArea.clientHeight, CAMERA_NEAR, CAMERA_FAR
   );
-  camera.position.z = 10;
-  camera.position.set(-10, -20, 20);
+  camera.position.set(CAMERA_INITIAL_POSITION.x, CAMERA_INITIAL_POSITION.y, CAMERA_INITIAL_POSITION.z);
   // renderer
   const renderer = new THREE.WebGLRenderer();
   //renderer.setSize(window.innerWidth, window.innerHeight);
@@ -479,7 +489,7 @@ function createCtx(): Ctx
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
   // grid_helper
-  const grid_helper = new THREE.GridHelper(100, 10);
+  const grid_helper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS);
   scene.add(grid_helper);
   // orbit contols
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -500,13 +510,14 @@ function createCtx(): Ctx
 
 
 function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
+    position_index_max = 6 * (3+n_additional_deck);
     ctx.model_load_done_flag = false;
     const model_file = `${ASSET_BASE}/Ardea_Lightweight.named.glb`;
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
     const loader = new GLTFLoader();
     loader.load(model_file, (gltf) => {
         const model = gltf.scene;
-        model.scale.set(10, 10, 10);
+        model.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
         const collider_group = new THREE.Group();
         const model_objects = reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
         replaceWithLambertKeepColor(ctx.scene, {keepMap:false, keepAlpha:true});
@@ -544,7 +555,6 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
         const center = new THREE.Vector3();
         box.getCenter(center);
         center.y = 0;
-        console.log(center);
         model_group.position.sub(center);
 
         ctx.model_load_done_flag = true;
@@ -563,10 +573,9 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   const width = equipment_info.object_attribute.width;
   const uri = equipment_info.sila2_uri;
 
-  console.log(equipment_info);
   loader.load(equipment_info.object_attribute.file, (gltf) => {
     const model = gltf.scene;
-    model.scale.set(10,10,10);
+    model.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
     model.userData.initY ??= model.rotation.y;
     model.userData.rotate ??= 0;
     model.userData.object_attribute = equipment_info.object_attribute;
@@ -589,10 +598,10 @@ function place_arm(ctx: Ctx, visible: boolean, index: number) {
     const collider_group = reg.get(ctx, "Collider");
     const collider = collider_group.getObjectByName(`A-${index}`);
     if (!collider) return;
-    let x_pos = collider.position.x - 5;  // modified position by adequate offset.
+    let x_pos = collider.position.x + ARM_X_OFFSET;
     arm_obj.position.x = x_pos;
   } catch {
-    console.log("Arm not found");
+    // pass
   }
 }
 
@@ -646,7 +655,7 @@ function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
   const posCell = row.insertCell();
   posCell.dataset.col = "position";
   const posSelect = document.createElement('select');
-  for(let i = 0; i < 18; i++) {
+  for(let i = 0; i < position_index_max; i++) {
     const opt = document.createElement('option');
     opt.value = String(i);
     opt.textContent = `${i}`;
@@ -686,7 +695,6 @@ function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
 
 function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
   try {
-    //console.log(object_id, left_right, index, visible, width);
     const obj = reg.get(ctx, object_id);
     if (visible == false) {
       obj.visible = false;
@@ -707,7 +715,6 @@ function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index
 
     let offset_z = obj.userData.object_attribute.offset_z ?? 0;
     let offset_x = obj.userData.object_attribute.offset_x ?? 0;
-    console.log(`${object_id} placement ${offset_z} ${offset_x}`);
     if (left_right == 'A') {
       offset_z *= -1;
     }
@@ -726,7 +733,6 @@ function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index
       x_pos = (x_pos + x_pos2) / 2;
     }
     const rel = new THREE.Vector3(x_pos + offset_x, collider.position.y, collider.position.z + offset_z);
-    console.log(`position ${collider.position.x}, ${collider.position.y}, ${collider.position.z}`);
     const world = rel.clone();
     collider_group.localToWorld(world);
     const parent = obj.parent ?? ctx.scene;
@@ -778,11 +784,9 @@ function animate() {
   // Reset
   if (need_initialize) {
     cleanup();
-    console.log('----- initialize -----');
     setup(init_settings.additional_deck);
   }
   if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
-    console.log("mouse moved");
     point_collider(ctx, "Collider");
   }
 
