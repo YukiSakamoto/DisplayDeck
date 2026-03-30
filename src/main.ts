@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-//import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-//import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import GUI from 'lil-gui';
 import { placeNextTo,angleDiff, replaceWithLambertKeepColor } from './utils'
 import {
@@ -31,28 +29,7 @@ const display_settings: DisplaySettings = {
   directional_light_position_z: 3.0,
 };
 
-type SideLR = 'left' | 'right';
 type SideAB = 'A' | 'B';
-function side_lr2AB(side: string): SideAB | null
-{
-  let lowercase = side.toLowerCase();
-  if ("Left".toLowerCase() === lowercase) {
-    return "A";
-  } else if ("Right".toLowerCase() === lowercase) {
-    return "B";
-  }
-  return null;
-}
-function side_AB2lr(side: string): SideLR | null
-{
-  let lowercase = side.toLowerCase();
-  if ("A".toLowerCase() === lowercase) {
-    return "left";
-  } else if ("B".toLowerCase() === lowercase) {
-    return "right";
-  }
-  return null;
-}
 
 type EquipmentPosition = {
   side: SideAB;
@@ -125,8 +102,6 @@ const init_settings = {
 };
 
 const deck_visibility_settings: Map<string,boolean> = new Map();
-const deck_settings = new Map();
-const equipment_position_settings = new Map();
 
 function refreshStatusTable(ip: string, port: number, health: number) {
   const ipaddress_string: string = `${ip}:${port}`;
@@ -294,23 +269,6 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
 }
 
 function init_gui(equipment_list:EquipmentStatusList) {
-    //function makeAdapter(key, selMap, onChange) {
-    //  const ensure = () => selMap.get(key) ?? (selMap.set(key, {side: 'left', index: 0}), selMap.get(key));
-    //  return {
-    //    get side() { return ensure().side; },
-    //    set side(v) {
-    //      const cur = ensure(); 
-    //      const next = { ...cur, side: v};
-    //      selMap.set(key, next); onChange(next);
-    //    },
-    //    get index() { return ensure().index;},
-    //    set index(v) {
-    //      const cur = ensure();
-    //      const next = {...cur, index: (v|0)};
-    //      selMap.set(key, next); onChange(next);
-    //    },
-    //  };
-    //}
     const gui_obj = new GUI();
     gui_obj.add(display_settings, 'show_grid_helper');
     const gui_light_folder = gui_obj.addFolder('Light Settings');
@@ -336,7 +294,6 @@ function init_gui(equipment_list:EquipmentStatusList) {
     return gui_obj;
 };
 
-const objects = [];
 const threeArea = document.getElementById('three-area');
 if (!threeArea) {
   throw new Error("Missing #three-area");
@@ -351,8 +308,6 @@ const HEALTH_POLL_MS = 60_000;
 const RESET_ENDPOINT = 'http://localhost:8000/reset';
 let healthPollId: number | null = null;
 const DISCOVER_ENDPOINT = 'http://localhost:8000/sila/discover';
-const DISCOVER_POLL_MS = 60_000;
-let discoverPollID: number | null = null;
 const GET_TROLLEY_POSITION_ENDPOINT = 'http://localhost:8000/sila/trolley-position';
 
 function updateServerHealth(text: string, ok: boolean) {
@@ -589,7 +544,6 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
         deck_visibility_settings.set(`Left-2:${i}`, true);
         deck_visibility_settings.set(`Right-2:${i}`, true);
     }
-    deck_settings.set("arm_position", 0);
 }
 
 function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
@@ -828,13 +782,6 @@ function animate() {
     console.log('----- initialize -----');
     setup(init_settings.additional_deck);
   }
-  // Arm position
-  //if (ctx.model_load_done_flag === true) {
-  //    reg.get(ctx, "Arm").position.x = deck_settings.get("arm_position");
-  //    deck_visibility_settings.forEach((val, key) => {
-  //        reg.get(ctx, key).visible = val;
-  //    });
-  //}
   if (ctx.model_load_done_flag == true && ctx.mousemoved_flag) {
     console.log("mouse moved");
     point_collider(ctx, "Collider");
