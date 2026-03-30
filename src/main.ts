@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import GUI from 'lil-gui';
-import { placeNextTo,angleDiff, replaceWithLambertKeepColor } from './utils'
+import { placeNextTo, replaceWithLambertKeepColor } from './utils'
 import {
   reg, init_lighting, init_raycaster, init_helper,
   init_collider, point_collider,
@@ -222,7 +222,6 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
     {name: 'A', value: 'A'},
     {name: 'B', value: 'B'},
   ];
-  let i = 0;
   lr_options.forEach(options => {
     // 新しいオプション（ドロップダウン内の1要素）
     const opt = document.createElement('option');
@@ -468,9 +467,7 @@ function createCtx(): Ctx
   camera.position.set(CAMERA_INITIAL_POSITION.x, CAMERA_INITIAL_POSITION.y, CAMERA_INITIAL_POSITION.z);
   // renderer
   const renderer = new THREE.WebGLRenderer();
-  //renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setSize(threeArea.clientWidth, threeArea.clientHeight);
-  //document.body.appendChild(renderer.domElement);
   threeArea.appendChild(renderer.domElement);
   window.addEventListener('resize', () => {
     const width = threeArea.clientWidth;
@@ -480,9 +477,7 @@ function createCtx(): Ctx
     renderer.setSize(width, height);
   });
   
-  // handler
-  //ambient_light
-      const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
+  const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
   scene.add(ambient_light);
   // directional light
   const directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
@@ -518,7 +513,6 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
     loader.load(model_file, (gltf) => {
         const model = gltf.scene;
         model.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-        const collider_group = new THREE.Group();
         const model_objects = reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
         replaceWithLambertKeepColor(ctx.scene, {keepMap:false, keepAlpha:true});
 
@@ -704,7 +698,6 @@ function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index
     }
     const width = obj.userData.object_attribute.width ?? 1;
     index = Number(index);
-    const dRad = angleDiff(obj.rotation.y, obj.userData.initY || 0);
     if (left_right == 'B' && obj.userData.rotate % 2 == 1) {
       obj.rotateY(Math.PI); // left
       obj.userData.rotate += 1;
