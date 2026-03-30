@@ -113,7 +113,7 @@ type ArmStatus = {
 const arm_status: ArmStatus = {
   id: "arm-server",
   position: {position_index: 0 },
-  sila2_uri: {ip:"172.18.0.8", port: 50052},
+  sila2_uri: {ip:"172.18.0.6", port: 50052},
 };
 
 let need_initialize = false;
