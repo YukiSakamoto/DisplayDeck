@@ -348,58 +348,48 @@ function reflect_table2(server_name: string, type: string, address: string, port
 async function fetchServerHealth() {
   try {
     const res = await fetch(HEALTH_ENDPOINT, { cache: 'no-store' });
-    if (res.ok) { // 生存確認OK
-      updateServerHealth('OK', true);
-      fetch(DISCOVER_ENDPOINT, {cache: 'no-store'})
-        .then((res2) => {
-          if (!res2.ok) {
-            throw new Error(`Discover HTTP ${res2.status}`);
-          } 
-          return res2.json();
-        })
-        .then(data => {
-          //console.log(data);
-          if (serverLatest) {
-            serverLatest.textContent = `Latest: ${new Date().toLocaleString()}`;
-          }
-          if (tableBody2) {
-            tableBody2.replaceChildren();
-          }
-          for(let i = 0; i < data["servers"].length; i++) {
-            let server_data = data["servers"][i]
-            let address = server_data["address"]["ip"];
-            let port = server_data["address"]["port"];
-            let status = server_data["status"];
-            const exist = refreshStatusTable(address, port, status);
-            if (!exist) {
-              reflect_table2(
-                data["servers"][i]["name"], data["servers"][i]["type"],
-                address, port, data["servers"][i]["status"]
-              );
-            }
-          }
-        });
-      if (arm_status.sila2_uri) {
-        const endpoint_uri = `${GET_TROLLEY_POSITION_ENDPOINT}?ip=${arm_status.sila2_uri['ip']}&port=${String(arm_status.sila2_uri['port'])}&insecure=true`
-        console.log(`arm: ${endpoint_uri}`);
-        fetch(endpoint_uri, {cache: 'no-store'})
-          .then((res_trolley) => {
-            if (!res_trolley.ok) {
-              console.log('hogehogehoge');
-              throw new Error(`Trolley Posiotion ${res_trolley.status}`);
-            }
-            return res_trolley.json();
-          })
-          .then(data => {
-            let arm_position = data["server"]["position"];
-            place_arm(ctx, true, arm_position);
-            if (arm_status.sila2_uri) {
-              refreshTableArmPosition(arm_status.sila2_uri['ip'], arm_status.sila2_uri['port'], arm_position );
-            }
-          });
-      }
-    } else {
+    if (!res.ok) {
       updateServerHealth(`NG (${res.status})`, false);
+      return;
+    }
+    updateServerHealth('OK', true);
+
+    // 機器一覧の取得
+    try {
+      const res2 = await fetch(DISCOVER_ENDPOINT, { cache: 'no-store' });
+      if (!res2.ok) throw new Error(`Discover HTTP ${res2.status}`);
+      const data = await res2.json();
+      if (serverLatest) {
+        serverLatest.textContent = `Latest: ${new Date().toLocaleString()}`;
+      }
+      if (tableBody2) tableBody2.replaceChildren();
+      for (const server of data["servers"]) {
+        const address = server["address"]["ip"];
+        const port = server["address"]["port"];
+        const status = server["status"];
+        const exist = refreshStatusTable(address, port, status);
+        if (!exist) {
+          reflect_table2(server["name"], server["type"], address, port, status);
+        }
+      }
+    } catch (e) {
+      console.error('Discover failed:', e);
+    }
+
+    // アームの位置取得
+    if (arm_status.sila2_uri) {
+      try {
+        const { ip, port } = arm_status.sila2_uri;
+        const endpoint_uri = `${GET_TROLLEY_POSITION_ENDPOINT}?ip=${ip}&port=${port}&insecure=true`;
+        const res_trolley = await fetch(endpoint_uri, { cache: 'no-store' });
+        if (!res_trolley.ok) throw new Error(`Trolley Position ${res_trolley.status}`);
+        const data = await res_trolley.json();
+        const arm_position = data["server"]["position"];
+        place_arm(ctx, true, arm_position);
+        refreshTableArmPosition(ip, port, arm_position);
+      } catch (e) {
+        console.error('Trolley position failed:', e);
+      }
     }
   } catch {
     updateServerHealth('NG (network)', false);
@@ -568,7 +558,7 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
   insertControlTable(equipment_info.id, true, left_right, index, width, uri);
 }
 
-function place_arm(ctx: Ctx, visible: boolean, index: Number) {
+function place_arm(ctx: Ctx, visible: boolean, index: number) {
   try{
     const arm_obj = reg.get(ctx, "Arm");
     if (visible == false) {
