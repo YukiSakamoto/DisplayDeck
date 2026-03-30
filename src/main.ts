@@ -148,6 +148,27 @@ function refreshTableArmPosition(ip: string, port: number, position: number) {
   }
 }
 
+function buildPositionSelect(selectedIndex: number, onChange: (e: Event) => void): HTMLSelectElement {
+  const posSelect = document.createElement('select');
+  for (let i = 0; i < position_index_max; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `${i}`;
+    if (i === selectedIndex) opt.selected = true;
+    posSelect.appendChild(opt);
+  }
+  posSelect.addEventListener('change', onChange);
+  return posSelect;
+}
+
+function appendResetButton(cell: HTMLTableCellElement, onClick: () => void): void {
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.textContent = 'Reset';
+  resetButton.addEventListener('click', onClick);
+  cell.appendChild(resetButton);
+}
+
 function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number, uri?: EquipmentSila2Uri) {
   // テーブルが操作された時に、モデルの位置を反映する
   const reflect_position = function(elem: Event) {
@@ -239,22 +260,11 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   // 板の中での位置の数字を選択するところ
   const posCell = row.insertCell();
   posCell.dataset.col = "position";
-  const posSelect = document.createElement('select');
-  for(let i = 0; i < position_index_max; i++) {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = `${i}`;
-    if (i == index) {
-      opt.selected = true;
-    }
-    posSelect.appendChild(opt);
-  }
+  posCell.appendChild(buildPositionSelect(index, reflect_position));
   // 機器の幅（区画何枚分を取るか）
   const widthCell = row.insertCell();
   widthCell.dataset.col = "width";
   widthCell.textContent = String(width);
-  posSelect.addEventListener('change', (e) => { reflect_position(e); });
-  posCell.appendChild(posSelect);
 
   const addressCell = row.insertCell();
   addressCell.dataset.col = "address";
@@ -268,15 +278,9 @@ function insertControlTable(object_name: string, visible: boolean, lr: SideAB, i
   statusCell.textContent = "";
   // reset button
   const resetbuttonCell = row.insertCell();
-  const resetButton = document.createElement('button');
-  resetButton.type = 'button';
-  resetButton.textContent = 'Reset';
-  resetButton.addEventListener('click', () => {
-    if (uri != undefined) {
-      EquipmentReset(uri.ip, uri.port);
-    } 
+  appendResetButton(resetbuttonCell, () => {
+    if (uri != undefined) EquipmentReset(uri.ip, uri.port);
   });
-  resetbuttonCell.appendChild(resetButton);
 }
 
 function init_gui(equipment_list:EquipmentStatusList) {
@@ -365,15 +369,7 @@ function reflect_table2(server_name: string, type: string, address: string, port
   row.insertCell().textContent = String(status);
   // reset button
   const resetbuttonCell = row.insertCell();
-  const resetButton = document.createElement('button');
-  resetButton.type = 'button';
-  resetButton.textContent = 'Reset';
-  resetButton.addEventListener('click', () => {
-    if (address != undefined) {
-      EquipmentReset(address, port);
-    };
-  })
-  resetbuttonCell.appendChild(resetButton);
+  appendResetButton(resetbuttonCell, () => EquipmentReset(address, port));
 }
 
 async function fetchServerHealth() {
@@ -648,18 +644,7 @@ function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
   // position
   const posCell = row.insertCell();
   posCell.dataset.col = "position";
-  const posSelect = document.createElement('select');
-  for(let i = 0; i < position_index_max; i++) {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = `${i}`;
-    if (i == 0) {
-      opt.selected = true;
-    }
-    posSelect.appendChild(opt);
-  }
-  posSelect.addEventListener('change', (e) => {reflect_arm_position(e);});
-  posCell.appendChild(posSelect);
+  posCell.appendChild(buildPositionSelect(0, reflect_arm_position));
   // 機器の幅の行（空欄）
   const widthCell = row.insertCell();
 
@@ -676,15 +661,9 @@ function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
   statusCell.textContent = "";
   //reset button
   const resetbuttonCell = row.insertCell();
-  const resetButton = document.createElement('button');
-  resetButton.type = 'button';
-  resetButton.textContent = 'Reset';
-  resetButton.addEventListener('click', () => {
-    if (arm_status.sila2_uri != undefined) {
-      EquipmentReset(arm_status.sila2_uri.ip, arm_status.sila2_uri.port);
-    }
-  })
-  resetbuttonCell.appendChild(resetButton);
+  appendResetButton(resetbuttonCell, () => {
+    if (arm_status.sila2_uri != undefined) EquipmentReset(arm_status.sila2_uri.ip, arm_status.sila2_uri.port);
+  });
 }
 
 function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
