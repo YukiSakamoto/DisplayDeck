@@ -272,11 +272,31 @@ function init_gui(equipment_list:EquipmentStatusList) {
     const gui_obj = new GUI();
     gui_obj.add(display_settings, 'show_grid_helper');
     const gui_light_folder = gui_obj.addFolder('Light Settings');
-    gui_light_folder.add(display_settings, 'ambient_light_intensity', 0.0, 5.0);
-    gui_light_folder.add(display_settings, 'directional_light_intensity', 0.0, 100.0);
-    gui_light_folder.add(display_settings, 'directional_light_position_x', -5.0, 5.0);
-    gui_light_folder.add(display_settings, 'directional_light_position_y', -5.0, 5.0);
-    gui_light_folder.add(display_settings, 'directional_light_position_z', -5.0, 5.0);
+    gui_light_folder.add(display_settings, 'ambient_light_intensity', 0.0, 5.0)
+      .onChange((v: number) => {
+        const light = reg.get(ctx, 'light:ambient');
+        if (light instanceof THREE.AmbientLight) light.intensity = v;
+      });
+    gui_light_folder.add(display_settings, 'directional_light_intensity', 0.0, 100.0)
+      .onChange((v: number) => {
+        const light = reg.get(ctx, 'light:directional');
+        if (light instanceof THREE.DirectionalLight) light.intensity = v;
+      });
+    gui_light_folder.add(display_settings, 'directional_light_position_x', -5.0, 5.0)
+      .onChange((v: number) => {
+        const light = reg.get(ctx, 'light:directional');
+        if (light instanceof THREE.DirectionalLight) light.position.x = v;
+      });
+    gui_light_folder.add(display_settings, 'directional_light_position_y', -5.0, 5.0)
+      .onChange((v: number) => {
+        const light = reg.get(ctx, 'light:directional');
+        if (light instanceof THREE.DirectionalLight) light.position.y = v;
+      });
+    gui_light_folder.add(display_settings, 'directional_light_position_z', -5.0, 5.0)
+      .onChange((v: number) => {
+        const light = reg.get(ctx, 'light:directional');
+        if (light instanceof THREE.DirectionalLight) light.position.z = v;
+      });
 
     const init_gui_folder = gui_obj.addFolder('Initialize');
     init_gui_folder.add(init_settings, 'additional_deck', 0, 3, 1);
@@ -754,17 +774,6 @@ function cleanup() {
 
 function animate() {
   requestAnimationFrame(animate);
-
-  // light settings
-  let ambient_light = reg.get(ctx, "light:ambient");
-  if ( (ambient_light instanceof THREE.AmbientLight) != true ) { return; }
-  ambient_light.intensity = display_settings.ambient_light_intensity;
-  let directional_light = reg.get(ctx, "light:directional");
-  if ((directional_light instanceof THREE.DirectionalLight) != true) { return; }
-  directional_light.intensity = display_settings.directional_light_intensity;
-  directional_light.position.x = display_settings.directional_light_position_x;
-  directional_light.position.y = display_settings.directional_light_position_y;
-  directional_light.position.z = display_settings.directional_light_position_z;
 
   // Reset
   if (need_initialize) {
