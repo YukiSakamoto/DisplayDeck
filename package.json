@@ -19,7 +19,9 @@
   },
   "homepage": "https://github.com/YukiSakamoto/DisplayDeck#readme",
   "dependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "lil-gui": "^0.21.0",
+    "svelte": "^5.55.2",
     "three": "^0.182.0"
   },
   "devDependencies": {

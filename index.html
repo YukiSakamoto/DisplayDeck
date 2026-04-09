@@ -31,20 +31,10 @@
         background-color: #e0e0e0;
         order: 0;
     }
-    .collapsed {
-      display: none;
-    }
     #control-area.collapsed {
-      display: none;
-      flex: 0;
-      width: 0;
-      padding: 0;
-      margin: 0;
-    }
-    #toggle-control {
-        align-self: flex-start;
-        flex: 0 0 auto;
-        margin: 8px;
+      flex: 0 0 36px;
+      overflow: hidden;
+      padding: 4px 0;
     }
     table {
         width: 100%;
@@ -65,57 +55,11 @@
 	Ardea
   </H1-->
   <div id="container">
-    <div id="three-area">
-    </div>
-    <button id="toggle-control">Toggle</button>
-    <div id="control-area">
-      <h2>object control</h2>
-      <p id = "server-health">Server: (checking...)</p>
-      <table id="object-control-table">
-        <thead>
-          <tr>
-            <th>object</th>
-            <th>show</th>
-            <th>side</th>
-            <th>index</th>
-            <th>width</th>
-            <th>address</th>
-            <th>status</th>
-            <th>reset</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-
-      <h2>Unregistered Equipments</h2>
-      <p id = "update-time">Latest: None</p>
-      <table id="object-control-table2">
-        <thead>
-          <tr>
-            <th>name</th>
-            <th>display</th>
-            <th>type</th>
-            <th>address</th>
-            <th>port</th>
-            <th>status</th>
-            <th>reset</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-
-    </div>
+    <div id="three-area"></div>
+    <div id="control-area"></div>
 
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 
-<script>
-  const controlArea=document.getElementById('control-area');
-  const toggleBtn = document.getElementById('toggle-control');
-  toggleBtn.addEventListener('click', () => {
-    controlArea.classList.toggle('collapsed');
-    window.dispatchEvent(new Event('resize'));
-  });
-</script>
 </html>

@@ -1,3 +1,6 @@
+import { mount } from 'svelte';
+import { get } from 'svelte/store';
+import App from './App.svelte';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -21,10 +24,9 @@ import {
 import type { EquipmentStatus, EquipmentStatusList } from './config';
 import { place_arm, place_equipments } from './placement';
 import {
-  setPositionIndexMax, clearTable, clearDiscoverTable,
-  refreshStatusTable, refreshTableArmPosition,
-  insertControlTable, reflect_table2, init_arm,
-} from './ui/table';
+  equipmentRows, armRow, discoveredServers,
+  serverHealth, lastUpdate, positionIndexMax,
+} from './stores';
 
 let need_initialize = false;
 const init_settings = {
@@ -87,39 +89,47 @@ const threeArea = document.getElementById('three-area');
 if (!threeArea) {
   throw new Error("Missing #three-area");
 }
-const serverHealthEl = document.getElementById('server-health');
-const serverLatest = document.getElementById('update-time');
 
 let healthPollId: number | null = null;
-
-function updateServerHealth(text: string, ok: boolean) {
-  if (!serverHealthEl) return;
-  serverHealthEl.textContent = `Server: ${text}`;
-  serverHealthEl.style.color = ok ? '#0a7d2a' : '#b00020';
-}
-
 
 async function fetchServerHealth() {
   try {
     const health = await checkHealth();
     if (!health.ok) {
-      updateServerHealth(`NG (${health.status})`, false);
+      serverHealth.set({ text: `NG (${health.status})`, ok: false });
       return;
     }
-    updateServerHealth('OK', true);
+    serverHealth.set({ text: 'OK', ok: true });
 
     // 機器一覧の取得
     try {
       const servers = await discoverServers();
-      if (serverLatest) {
-        serverLatest.textContent = `Latest: ${new Date().toLocaleString()}`;
-      }
-      clearDiscoverTable();
+      lastUpdate.set(new Date().toLocaleString());
+      discoveredServers.set([]);
+
+      const currentRows = get(equipmentRows);
+      const currentArm = get(armRow);
+
       for (const server of servers) {
         const { ip, port } = server.address;
-        const exist = refreshStatusTable(ip, port, server.status);
-        if (!exist) {
-          reflect_table2(server.name, server.type, ip, port, server.status);
+        const addrStr = `${ip}:${port}`;
+
+        // 登録済み機器のステータスを更新
+        const inEquipments = currentRows.some(r => `${r.ip}:${r.port}` === addrStr);
+        const inArm = currentArm?.ip != null && `${currentArm.ip}:${currentArm.port}` === addrStr;
+
+        if (inEquipments) {
+          equipmentRows.update(rows =>
+            rows.map(r => `${r.ip}:${r.port}` === addrStr ? { ...r, status: server.status } : r)
+          );
+        } else if (inArm) {
+          armRow.update(r => r ? { ...r, status: server.status } : r);
+        } else {
+          // 未登録サーバーはdiscoverテーブルへ
+          discoveredServers.update(list => [
+            ...list,
+            { name: server.name, type: server.type, ip, port, status: server.status },
+          ]);
         }
       }
     } catch (e) {
@@ -132,24 +142,24 @@ async function fetchServerHealth() {
         const { ip, port } = arm_status.sila2_uri;
         const arm_position = await fetchTrolleyPosition(ip, port);
         place_arm(ctx, true, arm_position);
-        refreshTableArmPosition(ip, port, arm_position);
+        armRow.update(r => r ? { ...r, position: arm_position } : r);
       } catch (e) {
         console.error('Trolley position failed:', e);
       }
     }
   } catch {
-    updateServerHealth('NG (network)', false);
+    serverHealth.set({ text: 'NG (network)', ok: false });
   }
 }
 
 function startServerHealthPolling() {
-  if (!serverHealthEl || healthPollId !== null) return;
+  if (healthPollId !== null) return;
   fetchServerHealth().catch(() => {
-    updateServerHealth('NG (network)', false);
+    serverHealth.set({ text: 'NG (network)', ok: false });
   });
   healthPollId = window.setInterval(() => {
     fetchServerHealth().catch(() => {
-      updateServerHealth('NG (network)', false);
+      serverHealth.set({ text: 'NG (network)', ok: false });
     });
   }, HEALTH_POLL_MS);
 }
@@ -157,17 +167,15 @@ function startServerHealthPolling() {
 
 function createCtx(): Ctx
 {
-  // scene
   const scene = new THREE.Scene();
   if (!threeArea) {
     throw new Error("Missing #three-area");
   }
-  
+
   const camera = new THREE.PerspectiveCamera(
     CAMERA_FOV, threeArea.clientWidth / threeArea.clientHeight, CAMERA_NEAR, CAMERA_FAR
   );
   camera.position.set(CAMERA_INITIAL_POSITION.x, CAMERA_INITIAL_POSITION.y, CAMERA_INITIAL_POSITION.z);
-  // renderer
   const renderer = new THREE.WebGLRenderer();
   renderer.setSize(threeArea.clientWidth, threeArea.clientHeight);
   threeArea.appendChild(renderer.domElement);
@@ -178,17 +186,14 @@ function createCtx(): Ctx
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
   });
-  
+
   const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
   scene.add(ambient_light);
-  // directional light
   const directional_light = new THREE.DirectionalLight(0xFFFFFF, display_settings.directional_light_intensity);
   directional_light.position.set(1, 2, 3);
   scene.add(directional_light);
-  // grid_helper
   const grid_helper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS);
   scene.add(grid_helper);
-  // orbit contols
   const controls = new OrbitControls(camera, renderer.domElement);
 
   return {
@@ -207,7 +212,7 @@ function createCtx(): Ctx
 
 
 function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
-    setPositionIndexMax(6 * (3 + n_additional_deck));
+    positionIndexMax.set(6 * (3 + n_additional_deck));
     ctx.model_load_done_flag = false;
     const model_file = `${ASSET_BASE}/Ardea_Lightweight.named.glb`;
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
@@ -218,7 +223,6 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
         const model_objects = reg.extract_and_attach_to_scene(ctx, model, obj_name_list)
         replaceWithLambertKeepColor(ctx.scene, {keepMap:false, keepAlpha:true});
 
-        // Object clone and Layout modificaton
         let left_one = reg.get(ctx, "Left-2");
         let right_one = reg.get(ctx, "Right-2");
         for(let i = 0; i < n_additional_deck; i++) {
@@ -276,36 +280,55 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
     model.userData.rotate ??= 0;
     model.userData.object_attribute = equipment_info.object_attribute;
     reg.add(ctx, equipment_info.id, model);
-    // モデルを配置する
     place_equipments(ctx, equipment_info.id, left_right, index);
   });
-  // 画面下部の登録に表示する。
-  insertControlTable(ctx, equipment_info.id, true, left_right, index, width, uri);
+
+  equipmentRows.update(rows => [
+    ...rows,
+    {
+      id: equipment_info.id,
+      visible: true,
+      side: left_right,
+      position_index: index,
+      width,
+      ip: uri?.ip,
+      port: uri?.port,
+    },
+  ]);
 }
-
-
 
 
 let gui: GUI;
 const ctx = createCtx();
+
+const controlArea = document.getElementById('control-area');
+if (controlArea) {
+  controlArea.innerHTML = '';
+  mount(App, { target: controlArea, props: { ctx } });
+}
+
 setup();
 startServerHealthPolling();
 
 function setup(additional_deck: number = 1) {
-  // まずはArdeaのモデルをセットアップする
   init_model2(ctx, additional_deck);
   init_helper(ctx);
-  // 天板を直接選ぶのが難しいので、天板にコライダー（衝突判定用のオブジェクト）を作る
   init_collider(ctx, additional_deck);
   init_raycaster(ctx);
   init_lighting(ctx, display_settings.ambient_light_intensity, display_settings.directional_light_intensity);
 
-  // 実験機器のセットアップ
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(ctx, equipment_status[i]);
   }
-  init_arm(ctx);
-  // 右上のGUIのセットアップ
+
+  // アームの行をstoreに追加
+  armRow.set({
+    visible: true,
+    position: arm_status.position.position_index,
+    ip: arm_status.sila2_uri?.ip,
+    port: arm_status.sila2_uri?.port,
+  });
+
   gui = init_gui(equipment_status);
 }
 
@@ -313,7 +336,9 @@ function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
   reg.remove_all(ctx);
-  clearTable();
+  equipmentRows.set([]);
+  armRow.set(null);
+  discoveredServers.set([]);
   need_initialize = false;
 }
 
@@ -321,7 +346,6 @@ function cleanup() {
 function animate() {
   requestAnimationFrame(animate);
 
-  // Reset
   if (need_initialize) {
     cleanup();
     setup(init_settings.additional_deck);
