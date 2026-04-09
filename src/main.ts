@@ -8,102 +8,23 @@ import {
   init_collider, point_collider,
 } from './setupModel'
 import type { Ctx } from './setupModel';
-
-const ASSET_BASE = `${import.meta.env.BASE_URL}asset/`;
-
-const MODEL_SCALE = 10;
-const ARM_X_OFFSET = -5;
-const GRID_SIZE = 100;
-const GRID_DIVISIONS = 10;
-
-const CAMERA_FOV = 75;
-const CAMERA_NEAR = 0.1;
-const CAMERA_FAR = 1000;
-const CAMERA_INITIAL_POSITION = { x: -10, y: -20, z: 20 };
-
-let position_index_max: number = 0;
-
-type DisplaySettings = {
-  show_grid_helper: boolean;
-  ambient_light_intensity: number;
-  directional_light_intensity: number;
-  directional_light_position_x: number;
-  directional_light_position_y: number;
-  directional_light_position_z: number;
-};
-
-const display_settings: DisplaySettings = {
-  show_grid_helper: true,
-  ambient_light_intensity: 0.4,
-  directional_light_intensity: 1.0,
-  directional_light_position_x: 1.0,
-  directional_light_position_y: 2.0,
-  directional_light_position_z: 3.0,
-};
-
-type SideAB = 'A' | 'B';
-
-type EquipmentPosition = {
-  side: SideAB;
-  position_index: number;
-};
-type EquipmentObjectAttribute = {
-  file: string;
-  width: number;
-  offset_x? : number;
-  offset_z? : number;
-};
-type EquipmentSila2Uri = {
-  ip: string;
-  port: number;
-};
-type EquipmentStatus = {
-  id: string;
-  object_attribute: EquipmentObjectAttribute;
-  position: EquipmentPosition;
-  sila2_uri?: EquipmentSila2Uri;
-}
-type EquipmentStatusList = EquipmentStatus[];
-const equipment_status: EquipmentStatusList = [
-  { 
-    id: "peeler", 
-    object_attribute: {file: `${ASSET_BASE}/Xpeel_v2.glb`, width: 2, offset_x: 0, offset_z: 2},
-    position: {  side: "A", position_index: 5,  },
-    sila2_uri: {ip: "100.84.15.10", port: 8080}
-  },
-  { 
-    id: "centrifuge", 
-    object_attribute: {file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 3},
-    position: { side: "B", position_index: 6},
-    sila2_uri: {ip: "172.18.0.4", port: 50052 }
-  },
-  {
-    id: "thermal_cycler", 
-    object_attribute: {file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 2 },
-    position: { side: "A", position_index: 8},
-    sila2_uri: {ip:"172.18.0.5", port:50052 },
-  },
-  {
-    id: "sealer", 
-    object_attribute: {file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 2},
-    position: {side: "B", position_index: 12},
-  }
-];
-
-type ArmPosition = {
-  position_index: number;
-};
-type ArmStatus = {
-  id: string;
-  position: ArmPosition;
-  sila2_uri?: EquipmentSila2Uri;
-};
-
-const arm_status: ArmStatus = {
-  id: "arm-server",
-  position: {position_index: 0 },
-  sila2_uri: {ip:"172.18.0.6", port: 50052},
-};
+import {
+  HEALTH_POLL_MS,
+  checkHealth, discoverServers, fetchTrolleyPosition,
+} from './api';
+import {
+  ASSET_BASE,
+  MODEL_SCALE, GRID_SIZE, GRID_DIVISIONS,
+  CAMERA_FOV, CAMERA_NEAR, CAMERA_FAR, CAMERA_INITIAL_POSITION,
+  display_settings, equipment_status, arm_status,
+} from './config';
+import type { EquipmentStatus, EquipmentStatusList } from './config';
+import { place_arm, place_equipments } from './placement';
+import {
+  setPositionIndexMax, clearTable, clearDiscoverTable,
+  refreshStatusTable, refreshTableArmPosition,
+  insertControlTable, reflect_table2, init_arm,
+} from './ui/table';
 
 let need_initialize = false;
 const init_settings = {
@@ -115,173 +36,6 @@ const init_settings = {
 
 const deck_visibility_settings: Map<string,boolean> = new Map();
 
-function refreshStatusTable(ip: string, port: number, health: number) {
-  const ipaddress_string: string = `${ip}:${port}`;
-  if (tableBody) {
-    for(const row of Array.from(tableBody.rows)) {
-      const addressCell = row.querySelector<HTMLTableCellElement>('td[data-col="address"]')
-      if (addressCell?.textContent == ipaddress_string) {
-        const statusCell = row.querySelector<HTMLTableCellElement>('td[data-col="status"]');
-        if (statusCell) {
-          statusCell.textContent = `${health}`;
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-function refreshTableArmPosition(ip: string, port: number, position: number) {
-  const ipaddress_string: string = `${ip}:${port}`;
-  if (tableBody) {
-    for (const row of Array.from(tableBody.rows)) {
-      const addressCell = row.querySelector<HTMLTableCellElement>('td[data-col="address"]')
-      if (addressCell?.textContent == ipaddress_string) {
-        const positionCell = row.querySelector<HTMLTableCellElement>('td[data-col="position"]');
-        const positionSelect = positionCell?.querySelector<HTMLSelectElement>('select');
-        if (positionSelect) {
-          positionSelect.value = String(position);
-        }
-      }
-    }
-  }
-}
-
-function buildPositionSelect(selectedIndex: number, onChange: (e: Event) => void): HTMLSelectElement {
-  const posSelect = document.createElement('select');
-  for (let i = 0; i < position_index_max; i++) {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = `${i}`;
-    if (i === selectedIndex) opt.selected = true;
-    posSelect.appendChild(opt);
-  }
-  posSelect.addEventListener('change', onChange);
-  return posSelect;
-}
-
-function appendResetButton(cell: HTMLTableCellElement, onClick: () => void): void {
-  const resetButton = document.createElement('button');
-  resetButton.type = 'button';
-  resetButton.textContent = 'Reset';
-  resetButton.addEventListener('click', onClick);
-  cell.appendChild(resetButton);
-}
-
-function insertControlTable(object_name: string, visible: boolean, lr: SideAB, index: number, width: number, uri?: EquipmentSila2Uri) {
-  // テーブルが操作された時に、モデルの位置を反映する
-  const reflect_position = function(elem: Event) {
-    // この行の中のすべての要素を取得する。
-    const select = elem.currentTarget as HTMLSelectElement;
-    if (!(select instanceof HTMLSelectElement)) return;
-    const currentRow = select.closest('tr');
-    if (currentRow) {
-      const objectName = currentRow.cells[0].textContent;
-      let visible = null;
-      const visible_checkbox = currentRow.cells[1].querySelector<HTMLInputElement>('input[type="checkbox"]');
-      if (visible_checkbox) {
-        visible = visible_checkbox.checked;
-      }
-      const lr_dropdown = currentRow.cells[2].querySelector('select');
-      let lr_value: SideAB|null = null;
-      if (lr_dropdown) {
-        const v = lr_dropdown.value;
-        if (v === 'A' || v === 'B') {
-          lr_value = v;
-        }
-      }
-      const index_dropdown = currentRow.cells[3].querySelector('select');
-      let index_value: number | null = null;
-      if (index_dropdown) {
-        const parsed = Number(index_dropdown.value);
-        if (!Number.isNaN(parsed)) {
-          index_value = parsed;
-        }
-      }
-      if (visible != null && lr_value != null && index_value != null) {
-        place_equipments(ctx, objectName, lr_value, index_value, visible);
-
-        // 一元化したテーブルの方を書き換える
-        for(let i = 0; i < equipment_status.length; i++) {
-          if(equipment_status[i].id == objectName) {
-            if (lr_value === 'A' || lr_value === 'B') {
-              equipment_status[i].position.side = lr_value;
-            }
-            equipment_status[i].position.position_index = index_value;
-          }
-        }
-      }
-    }
-  };
-
-  if (!tableBody) return;
-  const row = tableBody.insertRow();
-  row.dataset.objectIndex = String(0);
-
-  // オブジェクト名
-  const nameCell = row.insertCell();
-  nameCell.textContent = object_name;
-  nameCell.dataset.col = "name";
-
-  // 表示・非表示のチェックボックスのセル
-  const visibilityCell = row.insertCell();
-  visibilityCell.dataset.col = "visibility";
-  const visibilityInput = document.createElement('input');
-  visibilityInput.type = 'checkbox';
-  visibilityInput.checked = visible;
-  visibilityInput.addEventListener('change', (e) => {
-    reflect_position(e);
-  })
-  visibilityCell.appendChild(visibilityInput);
-
-  // Left/Rightのドロップボックスのセル
-  const lrCell = row.insertCell();
-  lrCell.dataset.col = "lr";
-  const lrSelect = document.createElement('select');
-  const lr_options = [
-    {name: 'A', value: 'A'},
-    {name: 'B', value: 'B'},
-  ];
-  lr_options.forEach(options => {
-    // 新しいオプション（ドロップダウン内の1要素）
-    const opt = document.createElement('option');
-    // 新しいオプションのvalueとして、lr_optionsの中のvalueの値を保存しておく
-    opt.value = options.value;
-    opt.textContent = options.name;
-    if (options.value == lr) {
-      opt.selected = true;
-    }
-    lrSelect.appendChild(opt);
-  });
-  lrSelect.addEventListener('change', (e) => { reflect_position(e);});
-  lrCell.appendChild(lrSelect);
-
-  // 板の中での位置の数字を選択するところ
-  const posCell = row.insertCell();
-  posCell.dataset.col = "position";
-  posCell.appendChild(buildPositionSelect(index, reflect_position));
-  // 機器の幅（区画何枚分を取るか）
-  const widthCell = row.insertCell();
-  widthCell.dataset.col = "width";
-  widthCell.textContent = String(width);
-
-  const addressCell = row.insertCell();
-  addressCell.dataset.col = "address";
-  if (uri != undefined) {
-    addressCell.textContent = `${uri.ip}:${uri.port}`;
-  }
-  // status
-  const statusCell = row.insertCell();
-  statusCell.dataset.col = "status";
-  statusCell.dataset.role = "pending-status"; //保留中の印をつけておく
-  statusCell.textContent = "";
-  // reset button
-  const resetbuttonCell = row.insertCell();
-  appendResetButton(resetbuttonCell, () => {
-    if (uri != undefined) EquipmentReset(uri.ip, uri.port);
-  });
-}
 
 function init_gui(equipment_list:EquipmentStatusList) {
     const gui_obj = new GUI();
@@ -333,17 +87,10 @@ const threeArea = document.getElementById('three-area');
 if (!threeArea) {
   throw new Error("Missing #three-area");
 }
-const tableBody = document.querySelector<HTMLTableSectionElement>('#object-control-table tbody');
-const tableBody2 = document.querySelector<HTMLTableSectionElement>('#object-control-table2 tbody');
 const serverHealthEl = document.getElementById('server-health');
 const serverLatest = document.getElementById('update-time');
 
-const HEALTH_ENDPOINT = 'http://localhost:8000/health';
-const HEALTH_POLL_MS = 60_000;
-const RESET_ENDPOINT = 'http://localhost:8000/reset';
 let healthPollId: number | null = null;
-const DISCOVER_ENDPOINT = 'http://localhost:8000/sila/discover';
-const GET_TROLLEY_POSITION_ENDPOINT = 'http://localhost:8000/sila/trolley-position';
 
 function updateServerHealth(text: string, ok: boolean) {
   if (!serverHealthEl) return;
@@ -351,52 +98,28 @@ function updateServerHealth(text: string, ok: boolean) {
   serverHealthEl.style.color = ok ? '#0a7d2a' : '#b00020';
 }
 
-function reflect_table2(server_name: string, type: string, address: string, port: number, status: number) {
-  if (!tableBody2) return;
-  const row = tableBody2.insertRow();
-  row.dataset.objectIndex = String(0);
-  // name
-  row.insertCell().textContent = server_name;
-  // visible
-  row.insertCell();
-  // type
-  row.insertCell().textContent = type;
-  // address
-  row.insertCell().textContent = address;
-  // port
-  row.insertCell().textContent = String(port);
-  //status
-  row.insertCell().textContent = String(status);
-  // reset button
-  const resetbuttonCell = row.insertCell();
-  appendResetButton(resetbuttonCell, () => EquipmentReset(address, port));
-}
 
 async function fetchServerHealth() {
   try {
-    const res = await fetch(HEALTH_ENDPOINT, { cache: 'no-store' });
-    if (!res.ok) {
-      updateServerHealth(`NG (${res.status})`, false);
+    const health = await checkHealth();
+    if (!health.ok) {
+      updateServerHealth(`NG (${health.status})`, false);
       return;
     }
     updateServerHealth('OK', true);
 
     // 機器一覧の取得
     try {
-      const res2 = await fetch(DISCOVER_ENDPOINT, { cache: 'no-store' });
-      if (!res2.ok) throw new Error(`Discover HTTP ${res2.status}`);
-      const data = await res2.json();
+      const servers = await discoverServers();
       if (serverLatest) {
         serverLatest.textContent = `Latest: ${new Date().toLocaleString()}`;
       }
-      if (tableBody2) tableBody2.replaceChildren();
-      for (const server of data["servers"]) {
-        const address = server["address"]["ip"];
-        const port = server["address"]["port"];
-        const status = server["status"];
-        const exist = refreshStatusTable(address, port, status);
+      clearDiscoverTable();
+      for (const server of servers) {
+        const { ip, port } = server.address;
+        const exist = refreshStatusTable(ip, port, server.status);
         if (!exist) {
-          reflect_table2(server["name"], server["type"], address, port, status);
+          reflect_table2(server.name, server.type, ip, port, server.status);
         }
       }
     } catch (e) {
@@ -407,11 +130,7 @@ async function fetchServerHealth() {
     if (arm_status.sila2_uri) {
       try {
         const { ip, port } = arm_status.sila2_uri;
-        const endpoint_uri = `${GET_TROLLEY_POSITION_ENDPOINT}?ip=${ip}&port=${port}&insecure=true`;
-        const res_trolley = await fetch(endpoint_uri, { cache: 'no-store' });
-        if (!res_trolley.ok) throw new Error(`Trolley Position ${res_trolley.status}`);
-        const data = await res_trolley.json();
-        const arm_position = data["server"]["position"];
+        const arm_position = await fetchTrolleyPosition(ip, port);
         place_arm(ctx, true, arm_position);
         refreshTableArmPosition(ip, port, arm_position);
       } catch (e) {
@@ -435,19 +154,6 @@ function startServerHealthPolling() {
   }, HEALTH_POLL_MS);
 }
 
-async function EquipmentReset(ip: string, port: number) {
-  try {
-    const reset_uri = `${RESET_ENDPOINT}?ip=${ip}&port=${String(port)}&insecure=true`
-    const res = await fetch(reset_uri, {cache: 'no-store'});
-    if (res.ok) {
-      alert(`Sent Reset Signal to ${ip}:${String(port)}`);
-    } else {
-      alert(`Sent Reset Signal to ${ip}:${String(port)}, but maybe Failed. ${await res.text()}`);
-    }
-  } catch {
-      alert(`Sent Reset Signal to ${ip}:${String(port)}, but Failed`);
-  }
-}
 
 function createCtx(): Ctx
 {
@@ -501,7 +207,7 @@ function createCtx(): Ctx
 
 
 function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
-    position_index_max = 6 * (3+n_additional_deck);
+    setPositionIndexMax(6 * (3 + n_additional_deck));
     ctx.model_load_done_flag = false;
     const model_file = `${ASSET_BASE}/Ardea_Lightweight.named.glb`;
     const obj_name_list = ['Left-1', 'Left-2', 'Left-3', 'Right-1', 'Right-2', 'Right-3', 'Arm'];
@@ -574,148 +280,11 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
     place_equipments(ctx, equipment_info.id, left_right, index);
   });
   // 画面下部の登録に表示する。
-  insertControlTable(equipment_info.id, true, left_right, index, width, uri);
+  insertControlTable(ctx, equipment_info.id, true, left_right, index, width, uri);
 }
 
-function place_arm(ctx: Ctx, visible: boolean, index: number) {
-  try{
-    const arm_obj = reg.get(ctx, "Arm");
-    if (visible == false) {
-      arm_obj.visible = false;
-      return;
-    }
-    index = Number(index);
-    const collider_group = reg.get(ctx, "Collider");
-    const collider = collider_group.getObjectByName(`A-${index}`);
-    if (!collider) return;
-    let x_pos = collider.position.x + ARM_X_OFFSET;
-    arm_obj.position.x = x_pos;
-  } catch {
-    // pass
-  }
-}
 
-function init_arm(ctx: Ctx, equipment_info: ArmStatus) {
-  const reflect_arm_position = function(elem: Event) {
-    const select = elem.currentTarget as HTMLSelectElement;
-    if (!(select instanceof HTMLSelectElement)) return;
-    const currentRow = select.closest('tr');
-    if (currentRow) {
-      const objectName = currentRow.cells[0].textContent;
-      let visible = true;
-      const visible_checkbox = currentRow.cells[1].querySelector<HTMLInputElement>('input[type="checkbox"]');
-      if (visible_checkbox) {
-        visible = visible_checkbox.checked;
-      }
 
-      const index_dropdown = currentRow.cells[3].querySelector('select');
-      let index_value: number | null = null;
-      if (index_dropdown) {
-        const parsed = Number(index_dropdown.value);
-        if (!Number.isNaN(parsed)) {
-          index_value = parsed;
-          place_arm(ctx, visible, index_value);
-        }
-      }
-    }
-
-  };
-  if (!tableBody) return;
-  const row = tableBody.insertRow();
-  row.dataset.objectIndex = String(0);
-  // オブジェクト名
-  const nameCell = row.insertCell();
-  nameCell.textContent = "Arm";
-  nameCell.dataset.col = "name";
-
-  const visibilityCell = row.insertCell();
-  visibilityCell.dataset.col = "visibility";
-  const visibilityInput = document.createElement('input');
-  visibilityInput.type = 'checkbox';
-  visibilityInput.checked = true;
-  visibilityInput.addEventListener('change', (e) => {
-    reflect_arm_position(e);
-  });
-  visibilityCell.appendChild(visibilityInput);
-
-  // left or rightのカラム
-  const lrCell = row.insertCell();
-
-  // position
-  const posCell = row.insertCell();
-  posCell.dataset.col = "position";
-  posCell.appendChild(buildPositionSelect(0, reflect_arm_position));
-  // 機器の幅の行（空欄）
-  const widthCell = row.insertCell();
-
-  // ipアドレス
-  const addressCell = row.insertCell();
-  addressCell.dataset.col = "address";
-  if (arm_status.sila2_uri != undefined) {
-    addressCell.textContent = `${arm_status.sila2_uri.ip}:${arm_status.sila2_uri.port}`;
-  }
-  // status
-  const statusCell = row.insertCell();
-  statusCell.dataset.col = "status";
-  statusCell.dataset.role = "pending-status";
-  statusCell.textContent = "";
-  //reset button
-  const resetbuttonCell = row.insertCell();
-  appendResetButton(resetbuttonCell, () => {
-    if (arm_status.sila2_uri != undefined) EquipmentReset(arm_status.sila2_uri.ip, arm_status.sila2_uri.port);
-  });
-}
-
-function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB, index: number, visible: boolean = true) {
-  try {
-    const obj = reg.get(ctx, object_id);
-    if (visible == false) {
-      obj.visible = false;
-      return;
-    } else {
-      obj.visible = true;
-    }
-    const width = obj.userData.object_attribute.width ?? 1;
-    index = Number(index);
-    if (left_right == 'B' && obj.userData.rotate % 2 == 1) {
-      obj.rotateY(Math.PI); // left
-      obj.userData.rotate += 1;
-    } else if (left_right == 'A' && obj.userData.rotate % 2 == 0) {
-      obj.rotateY(Math.PI); // right
-      obj.userData.rotate += 1;
-    }
-
-    let offset_z = obj.userData.object_attribute.offset_z ?? 0;
-    let offset_x = obj.userData.object_attribute.offset_x ?? 0;
-    if (left_right == 'A') {
-      offset_z *= -1;
-    }
-
-    const collider_group = reg.get(ctx, "Collider");
-    const collider = collider_group.getObjectByName(`${left_right}-${index}`);
-    if (!collider) return;
-    let x_pos = collider.position.x;
-
-    if (width % 2 == 0) {
-      // 位置は、原則、オブジェクトの真ん中が乗っかる板の番号。
-      // もし偶数のときは、その次のパネルとの中央位置を扱う方が良い。
-      const collider2 = collider_group.getObjectByName(`${left_right}-${index + 1}`);
-      if (!collider2) return;
-      let x_pos2 = collider2.position.x;
-      x_pos = (x_pos + x_pos2) / 2;
-    }
-    const rel = new THREE.Vector3(x_pos + offset_x, collider.position.y, collider.position.z + offset_z);
-    const world = rel.clone();
-    collider_group.localToWorld(world);
-    const parent = obj.parent ?? ctx.scene;
-    parent.updateWorldMatrix(true, true);
-    parent.worldToLocal(world);
-    obj.position.copy(world);
-    
-  } catch {
-    // pass;
-  }
-}
 
 let gui: GUI;
 const ctx = createCtx();
@@ -735,7 +304,7 @@ function setup(additional_deck: number = 1) {
   for (let i = 0; i < equipment_status.length; i++) {
     init_equipments(ctx, equipment_status[i]);
   }
-  init_arm(ctx, arm_status);
+  init_arm(ctx);
   // 右上のGUIのセットアップ
   gui = init_gui(equipment_status);
 }
@@ -744,8 +313,7 @@ function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
   reg.remove_all(ctx);
-  if (!tableBody){ return; }
-  tableBody.innerHTML = '';
+  clearTable();
   need_initialize = false;
 }
 
