@@ -8,15 +8,30 @@
   import { resetEquipment } from './api';
   import { equipment_status } from './config';
   import type { SideAB } from './config';
+  import { fade } from 'svelte/transition';
 
   let { ctx }: { ctx: Ctx } = $props();
+
+  type Toast = { id: number; message: string; ok: boolean };
+  let toasts = $state<Toast[]>([]);
+  let nextToastId = 0;
+
+  function notify(message: string, ok: boolean) {
+    const id = nextToastId++;
+    toasts = [...toasts, { id, message, ok }];
+    setTimeout(() => {
+      toasts = toasts.filter(t => t.id !== id);
+    }, 4000);
+  }
 
   let expanded = $state(true);
 
   function toggle() {
     expanded = !expanded;
     document.getElementById('control-area')?.classList.toggle('collapsed', !expanded);
-    window.dispatchEvent(new Event('resize'));
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
   }
 
   let positionOptions = $derived(
@@ -43,9 +58,9 @@
   async function handleReset(ip: string, port: number) {
     try {
       const result = await resetEquipment(ip, port);
-      alert(result.message);
+      notify(result.message, true);
     } catch {
-      alert(`Sent Reset Signal to ${ip}:${port}, but Failed`);
+      notify(`Reset failed: ${ip}:${port}`, false);
     }
   }
 </script>
@@ -184,6 +199,14 @@
 </table>
 {/if}
 
+<div class="toast-container">
+  {#each toasts as t (t.id)}
+    <div class="toast" class:toast-ok={t.ok} class:toast-err={!t.ok} transition:fade>
+      {t.message}
+    </div>
+  {/each}
+</div>
+
 <style>
   .toggle-row {
     display: flex;
@@ -202,4 +225,24 @@
     cursor: pointer;
     border-radius: 4px;
   }
+
+  .toast-container {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+  .toast {
+    padding: 10px 16px;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    max-width: 300px;
+  }
+  .toast-ok  { background: #2e7d32; }
+  .toast-err { background: #c62828; }
 </style>
