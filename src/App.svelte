@@ -25,10 +25,19 @@
   }
 
   let expanded = $state(true);
+  let layout = $state<'left' | 'bottom'>('left');
 
   function toggle() {
     expanded = !expanded;
     document.getElementById('control-area')?.classList.toggle('collapsed', !expanded);
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+
+  function toggleLayout() {
+    layout = layout === 'left' ? 'bottom' : 'left';
+    document.getElementById('container')?.classList.toggle('bottom-layout', layout === 'bottom');
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event('resize'));
     });
@@ -66,8 +75,11 @@
 </script>
 
 <div class="toggle-row">
+  <button class="toggle-btn" onclick={toggleLayout} title={layout === 'left' ? '下部に移動' : '左に移動'}>
+    {layout === 'left' ? '⇅' : '⇄'}
+  </button>
   <button class="toggle-btn" onclick={toggle} title={expanded ? 'パネルを閉じる' : 'パネルを開く'}>
-    {expanded ? '◀' : '▶'}
+    {expanded ? (layout === 'left' ? '◀' : '▼') : (layout === 'left' ? '▶' : '▲')}
   </button>
 </div>
 
@@ -211,6 +223,7 @@
   .toggle-row {
     display: flex;
     justify-content: flex-end;
+    gap: 4px;
     padding: 4px;
     position: sticky;
     top: 0;
