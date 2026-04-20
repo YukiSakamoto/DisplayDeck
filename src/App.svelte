@@ -64,6 +64,30 @@
     place_arm(ctx, visible, index);
   }
 
+  const STATUS_LABELS: Record<number, string> = {
+    0: 'Not connected',
+    1: 'Idle',
+    2: 'Running',
+    3: 'Error',
+  };
+
+  function statusLabel(status: number | string | null | undefined): string {
+    if (status == null || status === '') return '';
+    const n = Number(status);
+    return STATUS_LABELS[n] ?? String(status);
+  }
+
+  const STATUS_CLASSES: Record<number, string> = {
+    1: 'status-idle',
+    2: 'status-running',
+    3: 'status-error',
+  };
+
+  function statusClass(status: number | string | null | undefined): string {
+    if (status == null || status === '') return '';
+    return STATUS_CLASSES[Number(status)] ?? '';
+  }
+
   async function handleReset(ip: string, port: number) {
     try {
       const result = await resetEquipment(ip, port);
@@ -134,7 +158,7 @@
         </td>
         <td>{row.width}</td>
         <td>{row.ip != null ? `${row.ip}:${row.port}` : ''}</td>
-        <td>{row.status ?? ''}</td>
+        <td class="status {statusClass(row.status)}">{statusLabel(row.status)}</td>
         <td>
           {#if row.ip != null}
             <button onclick={() => handleReset(row.ip!, row.port!)}>Reset</button>
@@ -167,7 +191,7 @@
         </td>
         <td></td>
         <td>{arm.ip != null ? `${arm.ip}:${arm.port}` : ''}</td>
-        <td>{arm.status ?? ''}</td>
+        <td class="status {statusClass(arm.status)}">{statusLabel(arm.status)}</td>
         <td>
           {#if arm.ip != null}
             <button onclick={() => handleReset(arm.ip!, arm.port!)}>Reset</button>
@@ -201,7 +225,7 @@
         <td>{server.type}</td>
         <td>{server.ip}</td>
         <td>{server.port}</td>
-        <td>{server.status}</td>
+        <td class="status {statusClass(server.status)}">{statusLabel(server.status)}</td>
         <td>
           <button onclick={() => handleReset(server.ip, server.port)}>Reset</button>
         </td>
@@ -238,6 +262,13 @@
     cursor: pointer;
     border-radius: 4px;
   }
+
+  .status {
+    font-weight: bold;
+  }
+  .status-idle    { color: #2e7d32; }
+  .status-running { color: #e65100; }
+  .status-error   { color: #c62828; }
 
   .toast-container {
     position: fixed;
