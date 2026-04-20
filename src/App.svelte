@@ -9,6 +9,7 @@
   import { equipment_status } from './config';
   import type { SideAB } from './config';
   import { fade } from 'svelte/transition';
+  import { statusLabel, statusClass } from './utils';
 
   let { ctx }: { ctx: Ctx } = $props();
 
@@ -62,30 +63,6 @@
   function handleArmChange(visible: boolean, index: number) {
     armRow.update(r => r ? { ...r, visible, position: index } : r);
     place_arm(ctx, visible, index);
-  }
-
-  const STATUS_LABELS: Record<number, string> = {
-    0: 'Not connected',
-    1: 'Idle',
-    2: 'Running',
-    3: 'Error',
-  };
-
-  function statusLabel(status: number | string | null | undefined): string {
-    if (status == null || status === '') return '';
-    const n = Number(status);
-    return STATUS_LABELS[n] ?? String(status);
-  }
-
-  const STATUS_CLASSES: Record<number, string> = {
-    1: 'status-idle',
-    2: 'status-running',
-    3: 'status-error',
-  };
-
-  function statusClass(status: number | string | null | undefined): string {
-    if (status == null || status === '') return '';
-    return STATUS_CLASSES[Number(status)] ?? '';
   }
 
   async function handleReset(ip: string, port: number) {

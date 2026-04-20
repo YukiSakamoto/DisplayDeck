@@ -1,6 +1,30 @@
 
 import * as THREE from 'three';
 
+export const STATUS_LABELS: Record<number, string> = {
+  0: 'Not connected',
+  1: 'Idle',
+  2: 'Running',
+  3: 'Error',
+};
+
+export const STATUS_CLASSES: Record<number, string> = {
+  1: 'status-idle',
+  2: 'status-running',
+  3: 'status-error',
+};
+
+export function statusLabel(status: number | string | null | undefined): string {
+  if (status == null || status === '') return '';
+  const n = Number(status);
+  return STATUS_LABELS[n] ?? String(status);
+}
+
+export function statusClass(status: number | string | null | undefined): string {
+  if (status == null || status === '') return '';
+  return STATUS_CLASSES[Number(status)] ?? '';
+}
+
 export function placeNextTo(prev: THREE.Object3D, next: THREE.Object3D, gap = 0) {
   prev.updateWorldMatrix(true, true);
   next.updateWorldMatrix(true, true);

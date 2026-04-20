@@ -4,8 +4,9 @@ import App from './App.svelte';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import GUI from 'lil-gui';
-import { placeNextTo, replaceWithLambertKeepColor } from './utils'
+import { placeNextTo, replaceWithLambertKeepColor, statusLabel, statusClass } from './utils'
 import {
   reg, init_lighting, init_raycaster, init_helper,
   init_collider, point_collider,
@@ -88,6 +89,47 @@ function init_gui(equipment_list:EquipmentStatusList) {
 const threeArea = document.getElementById('three-area');
 if (!threeArea) {
   throw new Error("Missing #three-area");
+}
+
+// --- CSS2DRenderer (ステータスラベルのオーバーレイ) ---
+const css2dRenderer = new CSS2DRenderer();
+css2dRenderer.setSize(threeArea.clientWidth, threeArea.clientHeight);
+css2dRenderer.domElement.style.position = 'absolute';
+css2dRenderer.domElement.style.top = '0';
+css2dRenderer.domElement.style.left = '0';
+css2dRenderer.domElement.style.pointerEvents = 'none';
+threeArea.appendChild(css2dRenderer.domElement);
+
+const labelDivs = new Map<string, HTMLDivElement>();
+
+function createEquipmentLabel(id: string, object: THREE.Object3D): void {
+  const div = document.createElement('div');
+  div.className = 'object-label';
+  div.style.visibility = 'hidden'; // status が来るまで非表示
+  labelDivs.set(id, div);
+
+  const label = new CSS2DObject(div);
+
+  // オブジェクトのワールド空間バウンディングボックスの上端にラベルを配置
+  object.updateWorldMatrix(true, true);
+  const worldBox = new THREE.Box3().setFromObject(object);
+  const labelWorldPos = new THREE.Vector3(
+    (worldBox.min.x + worldBox.max.x) / 2,
+    worldBox.max.y + 1.0,
+    (worldBox.min.z + worldBox.max.z) / 2,
+  );
+  label.position.copy(object.worldToLocal(labelWorldPos));
+
+  object.add(label);
+}
+
+function updateLabel(id: string, status: number | string | null | undefined): void {
+  const div = labelDivs.get(id);
+  if (!div) return;
+  const text = statusLabel(status);
+  div.textContent = text;
+  div.className = `object-label ${statusClass(status)}`.trim();
+  div.style.visibility = text ? 'visible' : 'hidden';
 }
 
 let healthPollId: number | null = null;
@@ -185,6 +227,7 @@ function createCtx(): Ctx
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    css2dRenderer.setSize(width, height);
   });
 
   const ambient_light = new THREE.AmbientLight(0xFFFFFF, display_settings.ambient_light_intensity);
@@ -257,6 +300,9 @@ function init_model2(ctx: Ctx, n_additional_deck: number = 1) {
         center.y = 0;
         model_group.position.sub(center);
 
+        // Arm ラベル（最終位置確定後に生成）
+        createEquipmentLabel('Arm', reg.get(ctx, 'Arm'));
+
         ctx.model_load_done_flag = true;
     });
     obj_name_list.forEach( (name) => { deck_visibility_settings.set(name, true); });
@@ -281,6 +327,7 @@ function init_equipments(ctx:Ctx, equipment_info: EquipmentStatus ) {
     model.userData.object_attribute = equipment_info.object_attribute;
     reg.add(ctx, equipment_info.id, model);
     place_equipments(ctx, equipment_info.id, left_right, index);
+    createEquipmentLabel(equipment_info.id, model);
   });
 
   equipmentRows.update(rows => [
@@ -310,6 +357,14 @@ if (controlArea) {
 setup();
 startServerHealthPolling();
 
+// store の status 変化をラベルに反映
+equipmentRows.subscribe(rows => {
+  rows.forEach(row => updateLabel(row.id, row.status));
+});
+armRow.subscribe(arm => {
+  if (arm) updateLabel('Arm', arm.status);
+});
+
 function setup(additional_deck: number = 1) {
   init_model2(ctx, additional_deck);
   init_helper(ctx);
@@ -335,6 +390,7 @@ function setup(additional_deck: number = 1) {
 function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
+  labelDivs.clear();
   reg.remove_all(ctx);
   equipmentRows.set([]);
   armRow.set(null);
@@ -355,6 +411,7 @@ function animate() {
   }
 
   ctx.renderer.render(ctx.scene, ctx.camera);
+  css2dRenderer.render(ctx.scene, ctx.camera);
 }
 
 animate();
