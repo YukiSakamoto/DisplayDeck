@@ -80,6 +80,8 @@ function init_gui(equipment_list:EquipmentStatusList) {
         params[key] = val;
         deck_folder.add(params, key).onChange((v: boolean) => {
             deck_visibility_settings.set(key, v);
+            const obj = ctx.registry.get(key);
+            if (obj) obj.visible = v;
         });
     };
 
