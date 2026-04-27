@@ -105,7 +105,17 @@ const labelDivs = new Map<string, HTMLDivElement>();
 function createEquipmentLabel(id: string, object: THREE.Object3D): void {
   const div = document.createElement('div');
   div.className = 'object-label';
-  div.style.visibility = 'hidden'; // status が来るまで非表示
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'label-name';
+  nameSpan.textContent = id;
+
+  const statusSpan = document.createElement('span');
+  statusSpan.className = 'label-status';
+  statusSpan.textContent = 'Unknown';
+
+  div.appendChild(nameSpan);
+  div.appendChild(statusSpan);
   labelDivs.set(id, div);
 
   const label = new CSS2DObject(div);
@@ -115,7 +125,7 @@ function createEquipmentLabel(id: string, object: THREE.Object3D): void {
   const worldBox = new THREE.Box3().setFromObject(object);
   const labelWorldPos = new THREE.Vector3(
     (worldBox.min.x + worldBox.max.x) / 2,
-    worldBox.max.y + 1.0,
+    worldBox.max.y + 3.0,
     (worldBox.min.z + worldBox.max.z) / 2,
   );
   label.position.copy(object.worldToLocal(labelWorldPos));
@@ -126,10 +136,12 @@ function createEquipmentLabel(id: string, object: THREE.Object3D): void {
 function updateLabel(id: string, status: number | string | null | undefined): void {
   const div = labelDivs.get(id);
   if (!div) return;
-  const text = statusLabel(status);
-  div.textContent = text;
-  div.className = `object-label ${statusClass(status)}`.trim();
-  div.style.visibility = text ? 'visible' : 'hidden';
+  const text = statusLabel(status) || 'Unknown';
+  const statusSpan = div.querySelector<HTMLElement>('.label-status');
+  if (statusSpan) {
+    statusSpan.textContent = text;
+    statusSpan.className = `label-status ${statusClass(status)}`.trim();
+  }
 }
 
 let healthPollId: number | null = null;
@@ -390,6 +402,7 @@ function setup(additional_deck: number = 1) {
 function cleanup() {
   gui.destroy();
   deck_visibility_settings.clear();
+  labelDivs.forEach(div => div.remove());
   labelDivs.clear();
   reg.remove_all(ctx);
   equipmentRows.set([]);

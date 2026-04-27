@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Three.js ESM</title>
+  <title>DisplayDeck</title>
   <style>body { margin: 0; }</style>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
@@ -62,18 +62,28 @@
     }
     /* CSS2DRenderer ステータスラベル */
     .object-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       background: rgba(0, 0, 0, 0.65);
       color: #fff;
-      padding: 2px 8px;
+      padding: 3px 10px;
       border-radius: 4px;
       font-size: 16px;
-      font-weight: bold;
       white-space: nowrap;
       pointer-events: none;
     }
-    .object-label.status-idle    { color: #69f0ae; }
-    .object-label.status-running { color: #ffab40; }
-    .object-label.status-error   { color: #ff5252; }
+    .label-name {
+      font-weight: normal;
+      opacity: 0.8;
+      font-size: 13px;
+    }
+    .label-status {
+      font-weight: bold;
+    }
+    .label-status.status-idle    { color: #69f0ae; }
+    .label-status.status-running { color: #ffab40; }
+    .label-status.status-error   { color: #ff5252; }
 
     table {
         width: 100%;
