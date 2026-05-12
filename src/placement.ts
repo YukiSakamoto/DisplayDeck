@@ -65,6 +65,16 @@ export function place_equipments(ctx: Ctx, object_id: string, left_right: SideAB
     parent.updateWorldMatrix(true, true);
     parent.worldToLocal(world);
     obj.position.copy(world);
+
+    // 底面中心が配置位置に来るよう補正（配置・回転後に bbox を再計算）
+    const targetPos = obj.position.clone();
+    obj.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(obj);
+    obj.position.add(new THREE.Vector3(
+      targetPos.x - (box.min.x + box.max.x) / 2,
+      targetPos.y - box.min.y,
+      targetPos.z - (box.min.z + box.max.z) / 2,
+    ));
   } catch {
     // pass
   }

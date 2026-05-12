@@ -55,27 +55,32 @@ export type EquipmentStatusList = EquipmentStatus[];
 export const equipment_status: EquipmentStatusList = [
   {
     id: "peeler",
-    object_attribute: { file: `${ASSET_BASE}/Xpeel_v2.glb`, width: 2, offset_x: 0, offset_z: 2 },
+    object_attribute: { file: `${ASSET_BASE}/Xpeel_v2.glb`, width: 2, offset_x: 0, offset_z: 0 },
     position: { side: "A", position_index: 5 },
     sila2_uri: { ip: "100.84.15.10", port: 8080 },
   },
   {
     id: "centrifuge",
-    object_attribute: { file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 3 },
+    object_attribute: { file: `${ASSET_BASE}/Microplate_Centrifuge_v2.glb`, width: 2, offset_z: 0 },
     position: { side: "B", position_index: 6 },
     sila2_uri: { ip: "172.18.0.4", port: 50052 },
   },
   {
     id: "thermal_cycler",
-    object_attribute: { file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 2 },
+    object_attribute: { file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 0 },
     position: { side: "A", position_index: 8 },
     sila2_uri: { ip: "172.18.0.5", port: 50052 },
   },
   {
     id: "sealer",
-    object_attribute: { file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 2 },
+    object_attribute: { file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 0 },
     position: { side: "B", position_index: 12 },
   },
+  {
+    id: "fluent",
+    object_attribute: { file: `${ASSET_BASE}/Fluent480.glb`, width: 6, offset_z: 0 },
+    position: { side: "A", position_index: 17}
+  }
 ];
 
 export type ArmPosition = {
