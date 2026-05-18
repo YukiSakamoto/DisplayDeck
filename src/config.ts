@@ -67,13 +67,13 @@ export const equipment_status: EquipmentStatusList = [
   },
   {
     id: "thermal_cycler",
-    object_attribute: { file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 1, offset_z: 0 },
+    object_attribute: { file: `${ASSET_BASE}/automated_thermal_cycler.glb`, width: 2, offset_z: 0 },
     position: { side: "A", position_index: 8 },
     sila2_uri: { ip: "172.18.0.5", port: 50052 },
   },
   {
     id: "sealer",
-    object_attribute: { file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 1, offset_z: 0 },
+    object_attribute: { file: `${ASSET_BASE}/275-HS4T00-00.glb`, width: 2, offset_z: 0 },
     position: { side: "B", position_index: 12 },
   },
   {
